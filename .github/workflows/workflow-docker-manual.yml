@@ -1,11 +1,11 @@
 name: workflow-docker-manual
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       tags:
-        description: 'Enter tag name for test/dev image'
-        default: 'test'
+        required: true
+        type: string
 
 jobs:
   gcr-dockerhub-build-publish:
