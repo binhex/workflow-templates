@@ -6,6 +6,35 @@ on:
       tags:
         required: true
         type: string
+    secrets:
+      CR_PAT:
+        required: true
+      DOCKERHUB_PASSWORD:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+      DOCKERHUB_USERNAME:
+        required: true
+      EMAIL_ADDRESS:
+        required: true
+      EMAIL_PASSWORD:
+        required: true
+      GITLAB_TOKEN:
+        required: true
+      GITLAB_USERNAME:
+        required: true
+      IMMORTALITY_PAT:
+        required: true
+      LEMMY_USERNAME:
+        required: true
+      LEMMY_PASSWORD:
+        required: true
+      QUAY_TOKEN:
+        required: true
+      QUAY_USERNAME:
+        required: true
+      TDB_PAT:
+        required: true
 
 jobs:
   gcr-dockerhub-build-publish:
