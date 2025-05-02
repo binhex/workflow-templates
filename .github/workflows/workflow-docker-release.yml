@@ -136,8 +136,9 @@ jobs:
             echo "major_version=${major_version}" >> $GITHUB_OUTPUT
             echo "major_minor_version=${major_minor_version}" >> $GITHUB_OUTPUT
           else
-            echo "[warn] Release tag '${release_version}' does not include 3 or more octets, major and major-minor version tag names not constructed, exiting script..."
-            exit 1
+            echo "[warn] Release tag '${release_version}' does not include 3 or more octets, major and major-minor version tag names not constructed."
+            echo "major_version=" >> $GITHUB_OUTPUT
+            echo "major_minor_version=" >> $GITHUB_OUTPUT
           fi
         id: generate_version_tags
       - name: Generate tag names
