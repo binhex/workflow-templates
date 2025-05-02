@@ -25,10 +25,6 @@ on:
         required: true
       IMMORTALITY_PAT:
         required: true
-      LEMMY_USERNAME:
-        required: true
-      LEMMY_PASSWORD:
-        required: true
       QUAY_TOKEN:
         required: true
       QUAY_USERNAME:
