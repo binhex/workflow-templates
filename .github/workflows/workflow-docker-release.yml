@@ -6,6 +6,10 @@ on:
       tags:
         required: true
         type: string
+      platforms:
+        required: false
+        type: string
+        default: 'linux/amd64'
     secrets:
       CR_PAT:
         required: true
@@ -178,7 +182,7 @@ jobs:
           action: docker/build-push-action@v6
           with: |
             context: .
-            platforms: linux/amd64
+            platforms: ${{ inputs.platforms }}
             push: true
             tags: ${{ steps.generate_tag_names.outputs.tag_names }}
             build-args: |
