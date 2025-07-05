@@ -130,7 +130,7 @@ jobs:
             context: .
             platforms: ${{ inputs.platforms }}
             push: true
-            tags: "${registry}:${{ github.event.inputs.tags }}"
+            tags: ${{ registry }}:${{ github.event.inputs.tags }}
             build-args: |
               RELEASETAG=${{ github.event.inputs.tags }}
           attempt_limit: 3
