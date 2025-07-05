@@ -135,7 +135,7 @@ jobs:
           # Construct tag names
           tag_names=""
           for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ steps.identify_github_release_tag_name.outputs.tag }}, "
+            tag_names+="${registry}:${{ github.event.inputs.tags }}, "
           done
 
           # Remove trailing comma and space
