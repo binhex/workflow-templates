@@ -121,57 +121,6 @@ jobs:
           git_clone_scripts_repo="https://github.com/binhex/scripts.git"
           git clone "${git_clone_scripts_repo}" "${git_clone_scripts_dest}"
           "${git_clone_scripts_dest}/shell/arch/docker/testrunner.sh" --app-name ${{ steps.generate_app_name.outputs.app_name }} --image-name "ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
-      - name: Generate major and major-minor version tag names
-        shell: bash
-        run: |
-          # Get release tag name
-          release_version="${{ github.event.inputs.tags }}"
-
-          # Validate and construct major and major-minor versions
-          if [[ "${release_version}" =~ ^(v?[0-9]+)\.([0-9]+)\.[0-9]+ ]]; then
-            major_version="${BASH_REMATCH[1]}"
-            minor_version="${BASH_REMATCH[2]}"
-            major_minor_version="${major_version}.${minor_version}"
-            echo "[debug] Constructed major version tag name: ${major_version}"
-            echo "[debug] Constructed major-minor version tag name: ${major_minor_version}"
-            echo "major_version=${major_version}" >> $GITHUB_OUTPUT
-            echo "major_minor_version=${major_minor_version}" >> $GITHUB_OUTPUT
-          else
-            echo "[warn] Release tag '${release_version}' does not include 3 or more octets, major and major-minor version tag names not constructed."
-            echo "major_version=" >> $GITHUB_OUTPUT
-            echo "major_minor_version=" >> $GITHUB_OUTPUT
-          fi
-        id: generate_version_tags
-      - name: Generate tag names
-        shell: bash
-        run: |
-          # Define registries
-          registries=(
-            "${{ github.repository }}"
-            "quay.io/${{ github.repository }}"
-            "ghcr.io/${{ github.repository }}"
-            "registry.gitlab.com/${{ github.repository }}"
-          )
-
-          # Construct tag names
-          tag_names=""
-          for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ github.event.inputs.tags }}, ${registry}:latest, "
-            if [[ -n "${{ steps.generate_version_tags.outputs.major_version }}" ]]; then
-              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_version }}, "
-            fi
-            if [[ -n "${{ steps.generate_version_tags.outputs.major_minor_version }}" ]]; then
-              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_minor_version }}, "
-            fi
-          done
-
-          # Remove trailing comma and space
-          tag_names="${tag_names%, }"
-
-          # Output tag names
-          echo "[debug] Constructed tag names: ${tag_names}"
-          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
-        id: generate_tag_names
       # note this will re-use the internal cached amd64 image from the previous build
       - name: Build multi-arch Docker image, tag and push to registries
         uses: Wandalen/wretry.action@v3
@@ -181,7 +130,7 @@ jobs:
             context: .
             platforms: ${{ inputs.platforms }}
             push: true
-            tags: ${{ steps.generate_tag_names.outputs.tag_names }}
+            tags: "${registry}:${{ github.event.inputs.tags }}"
             build-args: |
               RELEASETAG=${{ github.event.inputs.tags }}
           attempt_limit: 3
