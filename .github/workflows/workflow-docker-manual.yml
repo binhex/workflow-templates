@@ -112,6 +112,7 @@ jobs:
             tags: ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}
             build-args: |
               RELEASETAG=${{ github.event.inputs.tags }}
+              APPNAME=${{ steps.generate_app_name.outputs.app_name }}
           attempt_limit: 3
           attempt_delay: 600000
       - name: Run tests using previously built image
@@ -157,5 +158,6 @@ jobs:
             tags: ${{ steps.generate_tag_names.outputs.tag_names }}
             build-args: |
               RELEASETAG=${{ github.event.inputs.tags }}
+              APPNAME=${{ steps.generate_app_name.outputs.app_name }}
           attempt_limit: 3
           attempt_delay: 600000
