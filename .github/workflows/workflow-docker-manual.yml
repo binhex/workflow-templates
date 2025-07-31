@@ -85,6 +85,15 @@ jobs:
         run: |
             echo "[debug] Input tags: '${{ inputs.tags }}'"
             echo "[debug] Input platforms: '${{ inputs.platforms }}'"
+      - name: DEBUG Check ARM64 condition
+        shell: bash
+        run: |
+            echo "[debug] Checking if '${{ inputs.platforms }}' contains 'linux/arm64'"
+            if [[ "${{ inputs.platforms }}" == *"linux/arm64"* ]]; then
+              echo "[debug] ARM64 condition: TRUE - ARM64 build will run"
+            else
+              echo "[debug] ARM64 condition: FALSE - ARM64 build will be skipped"
+            fi
       - name: Generate temporary tag name
         shell: bash
         run: |
