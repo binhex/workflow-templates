@@ -189,32 +189,24 @@ jobs:
           echo "[debug] Constructed tag names: ${tag_names}"
           echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
         id: generate_tag_names
-      - name: Build (use cache), tag and push amd64 to registries
-        uses: Wandalen/wretry.action@v3
+      - name: Build, tag and push amd64 to registries
+        uses: docker/build-push-action@v6
         with:
-          action: docker/build-push-action@v6
-          with: |
-            context: .
-            platforms: linux/amd64
-            push: true
-            tags: ${{ steps.generate_tag_names.outputs.tag_names }}
-            build-args: |
-              RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
-              APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-          attempt_limit: 3
-          attempt_delay: 600000
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.generate_tag_names.outputs.tag_names }}
+          build-args: |
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
       - name: Build, tag and push arm64 to registries
         if: contains(inputs.platforms, 'linux/arm64')
-        uses: Wandalen/wretry.action@v3
+        uses: docker/build-push-action@v6
         with:
-          action: docker/build-push-action@v6
-          with: |
-            context: .
-            platforms: linux/arm64
-            push: true
-            tags: ${{ steps.generate_tag_names.outputs.tag_names }}
-            build-args: |
-              RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
-              APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-          attempt_limit: 3
-          attempt_delay: 600000
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.generate_tag_names.outputs.tag_names }}
+          build-args: |
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
