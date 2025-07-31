@@ -151,23 +151,11 @@ jobs:
           echo "[debug] Constructed tag names: ${tag_names}"
           echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
         id: generate_tag_names
-      - name: Build, tag and push amd64 to registries
+      - name: Build, tag and push images to registries
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.generate_tag_names.outputs.tag_names }}
-          build-args: |
-            RELEASETAG=${{ inputs.tags }}
-            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-      - name: Build, tag and push arm64 to registries
-        if: contains(inputs.platforms, 'linux/arm64')
-        continue-on-error: false
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/arm64
+          platforms: ${{ inputs.platforms }}
           push: true
           tags: ${{ steps.generate_tag_names.outputs.tag_names }}
           build-args: |
