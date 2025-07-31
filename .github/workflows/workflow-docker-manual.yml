@@ -167,6 +167,7 @@ jobs:
           attempt_delay: 600000
       - name: Build, tag and push arm64 to registries
         if: contains(inputs.platforms, 'linux/arm64')
+        continue-on-error: false
         uses: Wandalen/wretry.action@v3
         with:
           action: docker/build-push-action@v6
