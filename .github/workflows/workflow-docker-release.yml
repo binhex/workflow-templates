@@ -80,6 +80,11 @@ jobs:
         shell: bash
         run: |
             export
+      - name: DEBUG Show input parameters
+        shell: bash
+        run: |
+            echo "[debug] Input tags: '${{ inputs.tags }}'"
+            echo "[debug] Input platforms: '${{ inputs.platforms }}'"
       - name: Identify GitHub Release tag name
         # get tag name from runners environment 'GITHUB_REF_NAME' and then use bash substring
         # to strip out '+' symbol - required due to gcr not supporting this as a tag

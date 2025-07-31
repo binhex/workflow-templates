@@ -80,6 +80,11 @@ jobs:
         shell: bash
         run: |
             export
+      - name: DEBUG Show input parameters
+        shell: bash
+        run: |
+            echo "[debug] Input tags: '${{ inputs.tags }}'"
+            echo "[debug] Input platforms: '${{ inputs.platforms }}'"
       - name: Generate temporary tag name
         shell: bash
         run: |
