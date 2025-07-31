@@ -116,7 +116,7 @@ jobs:
             load: true
             tags: ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}
             build-args: |
-              RELEASETAG=${{ github.event.inputs.tags }}
+              RELEASETAG=${{ inputs.tags }}
               APPNAME=${{ steps.generate_app_name.outputs.app_name }}
           attempt_limit: 3
           attempt_delay: 600000
@@ -141,7 +141,7 @@ jobs:
           # Construct tag names
           tag_names=""
           for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ github.event.inputs.tags }}, "
+            tag_names+="${registry}:${{ inputs.tags }}, "
           done
 
           # Remove trailing comma and space
@@ -161,7 +161,7 @@ jobs:
             push: true
             tags: ${{ steps.generate_tag_names.outputs.tag_names }}
             build-args: |
-              RELEASETAG=${{ github.event.inputs.tags }}
+              RELEASETAG=${{ inputs.tags }}
               APPNAME=${{ steps.generate_app_name.outputs.app_name }}
           attempt_limit: 3
           attempt_delay: 600000
@@ -176,7 +176,7 @@ jobs:
             push: true
             tags: ${{ steps.generate_tag_names.outputs.tag_names }}
             build-args: |
-              RELEASETAG=${{ github.event.inputs.tags }}
+              RELEASETAG=${{ inputs.tags }}
               APPNAME=${{ steps.generate_app_name.outputs.app_name }}
           attempt_limit: 3
           attempt_delay: 600000
