@@ -80,6 +80,10 @@ jobs:
         shell: bash
         run: |
             export
+      - name: DELME
+        shell: bash
+        run: |
+          echo "[debug] Generated input platforms is '${{ github.inputs.platforms }}'"
       - name: Generate temporary tag name
         shell: bash
         run: |
