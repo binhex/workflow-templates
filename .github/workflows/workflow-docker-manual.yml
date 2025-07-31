@@ -83,7 +83,8 @@ jobs:
       - name: DELME
         shell: bash
         run: |
-          echo "[debug] Generated input platforms is '${{ github.event.inputs.platforms }}'"
+          test=${{ github.event.inputs.platforms }}
+          echo "[debug] Generated input platforms is '${test}'"
       - name: Generate temporary tag name
         shell: bash
         run: |
