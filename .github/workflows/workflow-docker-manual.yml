@@ -108,18 +108,15 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/boost
       - name: Build amd64 image for testing
-        uses: Wandalen/wretry.action@v3
+        uses: docker/build-push-action@v6
         with:
-          action: docker/build-push-action@v6
-          with: |
-            context: .
-            load: true
-            tags: ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}
-            build-args: |
-              RELEASETAG=${{ inputs.tags }}
-              APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-          attempt_limit: 3
-          attempt_delay: 600000
+          context: .
+          load: true
+          platforms: linux/amd64
+          tags: ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}
+          build-args: |
+            RELEASETAG=${{ inputs.tags }}
+            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
       - name: Run tests using previously built image
         shell: bash
         run: |
