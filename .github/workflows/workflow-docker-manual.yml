@@ -10,6 +10,10 @@ on:
         required: false
         type: string
         default: 'linux/amd64'
+      checkout_ref:
+        required: false
+        type: string
+        default: ''
     secrets:
       CR_PAT:
         required: true
@@ -42,6 +46,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
       - name: Set up QEMU for multi-arch support
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -85,6 +91,8 @@ jobs:
         run: |
             echo "[debug] Input tags: '${{ inputs.tags }}'"
             echo "[debug] Input platforms: '${{ inputs.platforms }}'"
+            echo "[debug] Input checkout_ref: '${{ inputs.checkout_ref }}'"
+            echo "[debug] Actual checkout ref: '${{ inputs.checkout_ref || github.ref }}'"
       - name: Generate temporary tag name
         shell: bash
         run: |
