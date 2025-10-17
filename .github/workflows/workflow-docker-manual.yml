@@ -271,6 +271,7 @@ jobs:
   merge-push:
     runs-on: ubuntu-latest
     needs:
+      - build-arm64
       - prepare-build-amd64-test
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
     steps:
