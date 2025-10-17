@@ -313,7 +313,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - prepare-build-amd64-test
-      - build-arm64
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
     steps:
       - name: Download digests
@@ -350,18 +349,8 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          # Debug: Show what we received
-          echo "[debug] Received tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
-          echo "[debug] Input platforms: '${{ inputs.platforms }}'"
-
           # Convert tag names to array for processing
           IFS=',' read -ra TAG_ARRAY <<< "${{ needs.prepare-build-amd64-test.outputs.tag_names }}"
-
-          # Debug: Show array contents
-          echo "[debug] TAG_ARRAY length: ${#TAG_ARRAY[@]}"
-          for i in "${!TAG_ARRAY[@]}"; do
-            echo "[debug] TAG_ARRAY[$i]: '${TAG_ARRAY[$i]}'"
-          done
 
           # Check if we have any digests
           if [ -z "$(ls -A .)" ]; then
@@ -372,13 +361,6 @@ jobs:
           # Show available digests
           echo "[debug] Available digests:"
           ls -la
-
-          # Check if we have any tag names
-          if [ ${#TAG_ARRAY[@]} -eq 0 ] || [ -z "${TAG_ARRAY[0]}" ]; then
-            echo "[error] No tag names provided!"
-            echo "[error] TAG_ARRAY: ${TAG_ARRAY[@]}"
-            exit 1
-          fi
 
           # Process each tag
           for tag in "${TAG_ARRAY[@]}"; do
