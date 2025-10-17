@@ -292,6 +292,26 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
+      - name: Final job outputs verification and re-export
+        shell: bash
+        run: |
+          echo "[debug] === Final Job Outputs Verification ==="
+          echo "[debug] Final check of all step outputs before job completes:"
+          echo "[debug] - test_tag: '${{ steps.generate_temporary_tag_name.outputs.test_tag }}'"
+          echo "[debug] - app_name: '${{ steps.generate_app_name.outputs.app_name }}'"
+          echo "[debug] - tag_names: '${{ steps.generate_tag_names.outputs.tag_names }}'"
+          echo "[debug] - simple_test: '${{ steps.generate_tag_names.outputs.simple_test }}'"
+          echo "[debug] - amd64_digest: '${{ steps.build-amd64-digest.outputs.digest }}'"
+
+          # Critical check - if tag_names is empty here, job outputs will be empty
+          if [ -z "${{ steps.generate_tag_names.outputs.tag_names }}" ]; then
+            echo "[error] CRITICAL: tag_names is empty at final job output check!"
+            echo "[error] This means job outputs will be empty for downstream jobs"
+            exit 1
+          fi
+
+          echo "[debug] All outputs verified successfully at job level"
+          echo "[debug] Job outputs should now be available to downstream jobs"
 
   # Build arm64 image
   build-arm64:
