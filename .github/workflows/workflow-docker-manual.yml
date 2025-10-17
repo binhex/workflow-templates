@@ -245,7 +245,7 @@ jobs:
           echo "[debug] - tag_names: '${{ steps.generate_tag_names.outputs.tag_names }}'"
           echo "[debug] - simple_test: '${{ steps.generate_tag_names.outputs.simple_test }}'"
           echo "[debug] - amd64_digest: (will be set later)"
-          
+
           # Test if all outputs are available
           if [ -z "${{ steps.generate_tag_names.outputs.tag_names }}" ]; then
             echo "[error] CRITICAL: tag_names is empty at job output level!"
