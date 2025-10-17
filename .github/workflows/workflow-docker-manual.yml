@@ -312,6 +312,26 @@ jobs:
 
           echo "[debug] All outputs verified successfully at job level"
           echo "[debug] Job outputs should now be available to downstream jobs"
+          
+          # WORKAROUND: Save outputs to artifact since job outputs aren't working
+          echo "[debug] Creating artifact with job outputs as workaround..."
+          mkdir -p /tmp/job-outputs
+          {
+            echo "test_tag=${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
+            echo "app_name=${{ steps.generate_app_name.outputs.app_name }}"
+            echo "tag_names=${{ steps.generate_tag_names.outputs.tag_names }}"
+            echo "simple_test=${{ steps.generate_tag_names.outputs.simple_test }}"
+            echo "amd64_digest=${{ steps.build-amd64-digest.outputs.digest }}"
+          } > /tmp/job-outputs/outputs.env
+          echo "[debug] Job outputs saved to artifact file"
+          cat /tmp/job-outputs/outputs.env
+      - name: Upload job outputs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: job-outputs-prepare-build-amd64-test
+          path: /tmp/job-outputs/outputs.env
+          if-no-files-found: error
+          retention-days: 1
 
   # Build arm64 image
   build-arm64:
@@ -393,6 +413,39 @@ jobs:
           echo "[debug] All needs outcomes:"
           echo "[debug] - prepare-build-amd64-test: ${{ needs.prepare-build-amd64-test.result }}"
           echo "[debug] - build-arm64: ${{ needs.build-arm64.result }}"
+      - name: Download job outputs artifact (workaround)
+        uses: actions/download-artifact@v4
+        with:
+          name: job-outputs-prepare-build-amd64-test
+          path: /tmp/job-outputs
+      - name: Load job outputs from artifact
+        shell: bash
+        run: |
+          echo "[debug] Loading job outputs from artifact..."
+          if [ -f "/tmp/job-outputs/outputs.env" ]; then
+            echo "[debug] Artifact outputs file contents:"
+            cat /tmp/job-outputs/outputs.env
+            
+            # Source the file to load variables
+            source /tmp/job-outputs/outputs.env
+            
+            echo "[debug] Loaded outputs from artifact:"
+            echo "[debug] - tag_names: '${tag_names}'"
+            echo "[debug] - test_tag: '${test_tag}'"
+            echo "[debug] - app_name: '${app_name}'"
+            echo "[debug] - simple_test: '${simple_test}'"
+            echo "[debug] - amd64_digest: '${amd64_digest}'"
+            
+            # Export for use in subsequent steps
+            echo "ARTIFACT_TAG_NAMES=${tag_names}" >> $GITHUB_ENV
+            echo "ARTIFACT_TEST_TAG=${test_tag}" >> $GITHUB_ENV
+            echo "ARTIFACT_APP_NAME=${app_name}" >> $GITHUB_ENV
+            echo "ARTIFACT_SIMPLE_TEST=${simple_test}" >> $GITHUB_ENV
+            echo "ARTIFACT_AMD64_DIGEST=${amd64_digest}" >> $GITHUB_ENV
+          else
+            echo "[error] Artifact outputs file not found!"
+            exit 1
+          fi
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
@@ -429,15 +482,21 @@ jobs:
         run: |
           # Debug: Show what we received from prepare-build-amd64-test job
           echo "[debug] Job prepare-build-amd64-test result: ${{ needs.prepare-build-amd64-test.result }}"
-          echo "[debug] All outputs from prepare-build-amd64-test:"
+          echo "[debug] All outputs from prepare-build-amd64-test (job outputs - BROKEN):"
           echo "[debug]   - test_tag: '${{ needs.prepare-build-amd64-test.outputs.test_tag }}'"
           echo "[debug]   - app_name: '${{ needs.prepare-build-amd64-test.outputs.app_name }}'"
           echo "[debug]   - tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
           echo "[debug]   - amd64_digest: '${{ needs.prepare-build-amd64-test.outputs.amd64_digest }}'"
           echo "[debug] Input platforms: '${{ inputs.platforms }}'"
+          
+          echo "[debug] Using artifact-based outputs instead:"
+          echo "[debug]   - ARTIFACT_TAG_NAMES: '${{ env.ARTIFACT_TAG_NAMES }}'"
+          echo "[debug]   - ARTIFACT_TEST_TAG: '${{ env.ARTIFACT_TEST_TAG }}'"
+          echo "[debug]   - ARTIFACT_APP_NAME: '${{ env.ARTIFACT_APP_NAME }}'"
+          echo "[debug]   - ARTIFACT_SIMPLE_TEST: '${{ env.ARTIFACT_SIMPLE_TEST }}'"
 
-          # Convert tag names to array for processing
-          IFS=',' read -ra TAG_ARRAY <<< "${{ needs.prepare-build-amd64-test.outputs.tag_names }}"
+          # Convert tag names to array for processing - USE ARTIFACT VERSION
+          IFS=',' read -ra TAG_ARRAY <<< "${{ env.ARTIFACT_TAG_NAMES }}"
 
           # Debug: Show array contents
           echo "[debug] TAG_ARRAY length: ${#TAG_ARRAY[@]}"
