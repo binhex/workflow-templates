@@ -341,20 +341,22 @@ jobs:
           echo "[debug] Available digests:"
           ls -la
 
-          # Process each registry separately since each registry has its own copy of the digests
+          # Use ghcr.io as the source registry for all digests since all builds push there
+          source_registry="ghcr.io/${{ github.repository }}"
+
+          # Build source digest arguments using the consistent source registry
+          source_digests=$(printf "${source_registry}@sha256:%s " *)
+
+          echo "[debug] Using source registry: $source_registry"
+          echo "[debug] Source digests: $source_digests"
+
+          # Process each tag and create manifest lists
           for tag in "${TAG_ARRAY[@]}"; do
             # Trim whitespace
             tag=$(echo "$tag" | xargs)
 
-            # Extract registry from tag
-            registry="${tag%:*}"
-
-            # Build source digest arguments for this registry
-            source_digests=$(printf "${registry}@sha256:%s " *)
-
             echo "[debug] Processing tag: $tag"
-            echo "[debug] Source digests for this registry: $source_digests"
 
-            # Create manifest list for this specific tag using digests from the same registry
+            # Create manifest list for this specific tag using ghcr.io digests as source
             docker buildx imagetools create --tag "$tag" $source_digests
           done
