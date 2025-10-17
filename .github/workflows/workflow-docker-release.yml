@@ -125,6 +125,36 @@ jobs:
           echo "[debug] Generated app name is '${app_name}'"
           echo "app_name=$app_name" >> $GITHUB_OUTPUT
         id: generate_app_name
+      - name: Generate tag names
+        shell: bash
+        run: |
+          # Define registries
+          registries=(
+            "${{ github.repository }}"
+            "quay.io/${{ github.repository }}"
+            "ghcr.io/${{ github.repository }}"
+            "registry.gitlab.com/${{ github.repository }}"
+          )
+
+          # Construct tag names
+          tag_names=""
+          for registry in "${registries[@]}"; do
+            tag_names+="${registry}:${{ steps.identify_github_release_tag_name.outputs.tag }}, ${registry}:latest, "
+            if [[ -n "${{ steps.generate_version_tags.outputs.major_version }}" ]]; then
+              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_version }}, "
+            fi
+            if [[ -n "${{ steps.generate_version_tags.outputs.major_minor_version }}" ]]; then
+              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_minor_version }}, "
+            fi
+          done
+
+          # Remove trailing comma and space
+          tag_names="${tag_names%, }"
+
+          # Output tag names
+          echo "[debug] Constructed tag names: ${tag_names}"
+          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
+        id: generate_tag_names
       - name: Remove unnecessary directories to free up space
         run: |
           sudo rm -rf /usr/local/.ghcup
@@ -172,36 +202,6 @@ jobs:
             echo "major_minor_version=" >> $GITHUB_OUTPUT
           fi
         id: generate_version_tags
-      - name: Generate tag names
-        shell: bash
-        run: |
-          # Define registries
-          registries=(
-            "${{ github.repository }}"
-            "quay.io/${{ github.repository }}"
-            "ghcr.io/${{ github.repository }}"
-            "registry.gitlab.com/${{ github.repository }}"
-          )
-
-          # Construct tag names
-          tag_names=""
-          for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ steps.identify_github_release_tag_name.outputs.tag }}, ${registry}:latest, "
-            if [[ -n "${{ steps.generate_version_tags.outputs.major_version }}" ]]; then
-              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_version }}, "
-            fi
-            if [[ -n "${{ steps.generate_version_tags.outputs.major_minor_version }}" ]]; then
-              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_minor_version }}, "
-            fi
-          done
-
-          # Remove trailing comma and space
-          tag_names="${tag_names%, }"
-
-          # Output tag names
-          echo "[debug] Constructed tag names: ${tag_names}"
-          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
-        id: generate_tag_names
       - name: Build and push final amd64 images to all registries
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
