@@ -361,6 +361,9 @@ jobs:
             exit 1
           fi
 
+          # Showing all tags
+          echo "[debug] Tags to process: '${TAG_NAMES}'"
+
           # Show available digests
           echo "[debug] Available digests:"
           ls -la
