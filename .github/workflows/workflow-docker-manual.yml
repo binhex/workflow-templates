@@ -312,7 +312,7 @@ jobs:
 
           echo "[debug] All outputs verified successfully at job level"
           echo "[debug] Job outputs should now be available to downstream jobs"
-          
+
           # WORKAROUND: Save outputs to artifact since job outputs aren't working
           echo "[debug] Creating artifact with job outputs as workaround..."
           mkdir -p /tmp/job-outputs
@@ -425,17 +425,17 @@ jobs:
           if [ -f "/tmp/job-outputs/outputs.env" ]; then
             echo "[debug] Artifact outputs file contents:"
             cat /tmp/job-outputs/outputs.env
-            
+
             # Source the file to load variables
             source /tmp/job-outputs/outputs.env
-            
+
             echo "[debug] Loaded outputs from artifact:"
             echo "[debug] - tag_names: '${tag_names}'"
             echo "[debug] - test_tag: '${test_tag}'"
             echo "[debug] - app_name: '${app_name}'"
             echo "[debug] - simple_test: '${simple_test}'"
             echo "[debug] - amd64_digest: '${amd64_digest}'"
-            
+
             # Export for use in subsequent steps
             echo "ARTIFACT_TAG_NAMES=${tag_names}" >> $GITHUB_ENV
             echo "ARTIFACT_TEST_TAG=${test_tag}" >> $GITHUB_ENV
@@ -488,7 +488,7 @@ jobs:
           echo "[debug]   - tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
           echo "[debug]   - amd64_digest: '${{ needs.prepare-build-amd64-test.outputs.amd64_digest }}'"
           echo "[debug] Input platforms: '${{ inputs.platforms }}'"
-          
+
           echo "[debug] Using artifact-based outputs instead:"
           echo "[debug]   - ARTIFACT_TAG_NAMES: '${{ env.ARTIFACT_TAG_NAMES }}'"
           echo "[debug]   - ARTIFACT_TEST_TAG: '${{ env.ARTIFACT_TEST_TAG }}'"
