@@ -145,7 +145,7 @@ jobs:
           echo "[debug] Starting tag name generation..."
           echo "[debug] github.repository: '${{ github.repository }}'"
           echo "[debug] inputs.tags: '${{ inputs.tags }}'"
-          
+
           # Define registries
           registries=(
             "${{ github.repository }}"
