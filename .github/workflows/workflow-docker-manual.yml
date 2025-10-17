@@ -274,7 +274,18 @@ jobs:
       - build-arm64
       - prepare-build-amd64-test
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
+    env:
+      TAG_NAMES: ${{ needs.prepare-build-amd64-test.outputs.tag_names }}
     steps:
+      - name: Debug TAG_NAMES
+        run: |
+          echo "[debug] TAG_NAMES environment variable: '${TAG_NAMES}'"
+          echo "[debug] Direct output access: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
+          echo "[debug] All outputs from prepare-build-amd64-test:"
+          echo "  test_tag: '${{ needs.prepare-build-amd64-test.outputs.test_tag }}'"
+          echo "  app_name: '${{ needs.prepare-build-amd64-test.outputs.app_name }}'"
+          echo "  tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
+          echo "  amd64_digest: '${{ needs.prepare-build-amd64-test.outputs.amd64_digest }}'"
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
@@ -306,8 +317,8 @@ jobs:
           registry: registry.gitlab.com
           username: ${{ secrets.GITLAB_USERNAME }}
           password: ${{ secrets.GITLAB_TOKEN }}
-      - env:
-            TAG_NAMES: ${{ needs.prepare-build-amd64-test.outputs.tag_names }}
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
         run: |
           # Convert tag names to array for processing
           IFS=',' read -ra TAG_ARRAY <<< "${TAG_NAMES}"
