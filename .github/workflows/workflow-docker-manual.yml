@@ -275,7 +275,7 @@ jobs:
       - prepare-build-amd64-test
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
     env:
-      TAG_NAMES: ${{ github.repository }}:${{ inputs.tags }}, quay.io/${{ github.repository }}:${{ inputs.tags }}, ghcr.io/${{ github.repository }}:${{ inputs.tags }}, registry.gitlab.com/${{ github.repository }}:${{ inputs.tags }}
+      TAG_NAMES: ${{ github.repository }}:${{ inputs.tags }},quay.io/${{ github.repository }}:${{ inputs.tags }},ghcr.io/${{ github.repository }}:${{ inputs.tags }},registry.gitlab.com/${{ github.repository }}:${{ inputs.tags }}
     steps:
       - name: Debug TAG_NAMES
         run: |
@@ -341,12 +341,20 @@ jobs:
           echo "[debug] Available digests:"
           ls -la
 
-          # Process each tag
+          # Build the tag arguments
+          tag_args=""
           for tag in "${TAG_ARRAY[@]}"; do
             # Trim whitespace
             tag=$(echo "$tag" | xargs)
-            echo "[debug] Processing tag: $tag"
-
-            # Create manifest list with all available digests for this tag
-            docker buildx imagetools create $(printf "$tag@sha256:%s " *)
+            tag_args+="--tag $tag "
           done
+
+          # Build the source digest arguments (using the first registry as the source)
+          source_registry="${TAG_ARRAY[0]%:*}"  # Extract registry from first tag
+          source_digests=$(printf "${source_registry}@sha256:%s " *)
+
+          echo "[debug] Tag arguments: $tag_args"
+          echo "[debug] Source digests: $source_digests"
+
+          # Create manifest list with all tags pointing to the same digests
+          docker buildx imagetools create $tag_args $source_digests
