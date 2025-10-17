@@ -341,20 +341,20 @@ jobs:
           echo "[debug] Available digests:"
           ls -la
 
-          # Build the tag arguments
-          tag_args=""
+          # Process each registry separately since each registry has its own copy of the digests
           for tag in "${TAG_ARRAY[@]}"; do
             # Trim whitespace
             tag=$(echo "$tag" | xargs)
-            tag_args+="--tag $tag "
+
+            # Extract registry from tag
+            registry="${tag%:*}"
+
+            # Build source digest arguments for this registry
+            source_digests=$(printf "${registry}@sha256:%s " *)
+
+            echo "[debug] Processing tag: $tag"
+            echo "[debug] Source digests for this registry: $source_digests"
+
+            # Create manifest list for this specific tag using digests from the same registry
+            docker buildx imagetools create --tag "$tag" $source_digests
           done
-
-          # Build the source digest arguments (using the first registry as the source)
-          source_registry="${TAG_ARRAY[0]%:*}"  # Extract registry from first tag
-          source_digests=$(printf "${source_registry}@sha256:%s " *)
-
-          echo "[debug] Tag arguments: $tag_args"
-          echo "[debug] Source digests: $source_digests"
-
-          # Create manifest list with all tags pointing to the same digests
-          docker buildx imagetools create $tag_args $source_digests
