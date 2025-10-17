@@ -315,6 +315,8 @@ jobs:
       - build-arm64
       - prepare-build-amd64-test
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
+    env:
+      TAG_NAMES: ${{ needs.prepare-build-amd64-test.outputs.tag_names }}
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
@@ -351,7 +353,7 @@ jobs:
         working-directory: /tmp/digests
         run: |
           # Convert tag names to array for processing
-          IFS=',' read -ra TAG_ARRAY <<< "${{ needs.prepare-build-amd64-test.outputs.tag_names }}"
+          IFS=',' read -ra TAG_ARRAY <<< "${TAG_NAMES}"
 
           # Check if we have any digests
           if [ -z "$(ls -A .)" ]; then
