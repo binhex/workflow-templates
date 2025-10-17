@@ -42,13 +42,14 @@ on:
 
 jobs:
   # Prepare shared metadata and run tests on amd64
-  prepare-and-test:
+  prepare-build-amd64-test:
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.identify_github_release_tag_name.outputs.tag }}
       test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
       app_name: ${{ steps.generate_app_name.outputs.app_name }}
       tag_names: ${{ steps.generate_tag_names.outputs.tag_names }}
+      amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -142,6 +143,7 @@ jobs:
           build-args: |
             RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
+        id: build-amd64-test
       - name: Run tests using previously built image
         shell: bash
         run: |
@@ -200,61 +202,42 @@ jobs:
           echo "[debug] Constructed tag names: ${tag_names}"
           echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
         id: generate_tag_names
-
-  # Build amd64 image
-  build-amd64:
-    runs-on: ubuntu-24.04-arm
-    needs: prepare-and-test
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.checkout_ref || github.ref }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Login to GitHub
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
-      - name: Login to Quay
-        uses: docker/login-action@v3
-        with:
-          registry: quay.io
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_TOKEN }}
-      - name: Login to GitLab
-        uses: docker/login-action@v3
-        with:
-          registry: registry.gitlab.com
-          username: ${{ secrets.GITLAB_USERNAME }}
-          password: ${{ secrets.GITLAB_TOKEN }}
-      - name: Build and push amd64 image
-        id: build-amd64
+      - name: Build and push final amd64 images to all registries
+        if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
+          push: true
+          tags: ${{ steps.generate_tag_names.outputs.tag_names }}
+          build-args: |
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
+        id: build-final-amd64-only
+      - name: Build and push amd64 images by digest for multi-arch
+        if: contains(inputs.platforms, 'linux/arm64')
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=registry.gitlab.com/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            RELEASETAG=${{ needs.prepare-and-test.outputs.release_tag }}
-            APPNAME=${{ needs.prepare-and-test.outputs.app_name }}
-      - name: Export digest
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
+        id: build-amd64-digest
+      - name: Export amd64 digest for multi-arch
+        if: contains(inputs.platforms, 'linux/arm64')
         run: |
           mkdir -p /tmp/digests
-          digest="${{ steps.build-amd64.outputs.digest }}"
+          digest="${{ steps.build-amd64-digest.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
-      - name: Upload digest
+      - name: Upload amd64 digest
+        if: contains(inputs.platforms, 'linux/arm64')
         uses: actions/upload-artifact@v4
         with:
           name: digests-amd64
@@ -262,10 +245,12 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+
   # Build arm64 image
   build-arm64:
     runs-on: ubuntu-latest-arm64
-    needs: prepare-and-test
+    needs: prepare-build-amd64-test
+    if: contains(inputs.platforms, 'linux/arm64')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -308,8 +293,8 @@ jobs:
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=registry.gitlab.com/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            RELEASETAG=${{ needs.prepare-and-test.outputs.release_tag }}
-            APPNAME=${{ needs.prepare-and-test.outputs.app_name }}
+            RELEASETAG=${{ needs.prepare-build-amd64-test.outputs.release_tag }}
+            APPNAME=${{ needs.prepare-build-amd64-test.outputs.app_name }}
       - name: Export digest
         run: |
           mkdir -p /tmp/digests
@@ -324,12 +309,11 @@ jobs:
           retention-days: 1
 
   # Merge manifests and push final multi-arch image
-  merge:
+  merge-push:
     runs-on: ubuntu-latest
     needs:
-      - prepare-and-test
-      - build-amd64
-      - build-arm64
+      - prepare-build-amd64-test
+    if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
@@ -366,7 +350,17 @@ jobs:
         working-directory: /tmp/digests
         run: |
           # Convert tag names to array for processing
-          IFS=',' read -ra TAG_ARRAY <<< "${{ needs.prepare-and-test.outputs.tag_names }}"
+          IFS=',' read -ra TAG_ARRAY <<< "${{ needs.prepare-build-amd64-test.outputs.tag_names }}"
+
+          # Check if we have any digests
+          if [ -z "$(ls -A .)" ]; then
+            echo "[error] No digests found!"
+            exit 1
+          fi
+
+          # Show available digests
+          echo "[debug] Available digests:"
+          ls -la
 
           # Process each tag
           for tag in "${TAG_ARRAY[@]}"; do
@@ -374,6 +368,6 @@ jobs:
             tag=$(echo "$tag" | xargs)
             echo "[debug] Processing tag: $tag"
 
-            # Create manifest list with all digests for this tag
+            # Create manifest list with all available digests for this tag
             docker buildx imagetools create $(printf "$tag@sha256:%s " *)
           done
