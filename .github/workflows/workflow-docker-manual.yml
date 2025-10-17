@@ -200,7 +200,7 @@ jobs:
       - name: Upload amd64 digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-amd64-${{ inputs.tags }}
+          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -262,7 +262,7 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-arm64-${{ inputs.tags }}
+          name: digests-arm64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -275,7 +275,7 @@ jobs:
       - prepare-build-amd64-test
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
     env:
-      TAG_NAMES: ${{ needs.prepare-build-amd64-test.outputs.tag_names }}
+      TAG_NAMES: ${{ github.repository }}:${{ inputs.tags }}, quay.io/${{ github.repository }}:${{ inputs.tags }}, ghcr.io/${{ github.repository }}:${{ inputs.tags }}, registry.gitlab.com/${{ github.repository }}:${{ inputs.tags }}
     steps:
       - name: Debug TAG_NAMES
         run: |
@@ -290,7 +290,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: digests-*-${{ inputs.tags }}
+          pattern: digests-*-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
           merge-multiple: true
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
