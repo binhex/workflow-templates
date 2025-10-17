@@ -142,6 +142,10 @@ jobs:
       - name: Generate tag names
         shell: bash
         run: |
+          echo "[debug] Starting tag name generation..."
+          echo "[debug] github.repository: '${{ github.repository }}'"
+          echo "[debug] inputs.tags: '${{ inputs.tags }}'"
+          
           # Define registries
           registries=(
             "${{ github.repository }}"
@@ -150,18 +154,26 @@ jobs:
             "registry.gitlab.com/${{ github.repository }}"
           )
 
+          echo "[debug] Registries defined: ${#registries[@]}"
+          for i in "${!registries[@]}"; do
+            echo "[debug] Registry[$i]: '${registries[$i]}'"
+          done
+
           # Construct tag names
           tag_names=""
           for registry in "${registries[@]}"; do
             tag_names+="${registry}:${{ inputs.tags }}, "
+            echo "[debug] Added: '${registry}:${{ inputs.tags }}'"
           done
 
           # Remove trailing comma and space
           tag_names="${tag_names%, }"
 
           # Output tag names
-          echo "[debug] Constructed tag names: ${tag_names}"
+          echo "[debug] Final constructed tag names: '${tag_names}'"
+          echo "[debug] Writing to GITHUB_OUTPUT..."
           echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
+          echo "[debug] Tag name generation complete."
         id: generate_tag_names
       - name: Build and push final amd64 images to all registries
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
@@ -309,8 +321,13 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          # Debug: Show what we received
-          echo "[debug] Received tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
+          # Debug: Show what we received from prepare-build-amd64-test job
+          echo "[debug] Job prepare-build-amd64-test result: ${{ needs.prepare-build-amd64-test.result }}"
+          echo "[debug] All outputs from prepare-build-amd64-test:"
+          echo "[debug]   - test_tag: '${{ needs.prepare-build-amd64-test.outputs.test_tag }}'"
+          echo "[debug]   - app_name: '${{ needs.prepare-build-amd64-test.outputs.app_name }}'"
+          echo "[debug]   - tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
+          echo "[debug]   - amd64_digest: '${{ needs.prepare-build-amd64-test.outputs.amd64_digest }}'"
           echo "[debug] Input platforms: '${{ inputs.platforms }}'"
 
           # Convert tag names to array for processing
