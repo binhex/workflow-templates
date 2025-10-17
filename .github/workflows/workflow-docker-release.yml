@@ -241,7 +241,11 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
-          outputs: type=image,name=${{ needs.prepare-and-test.outputs.tag_names }},push-by-digest=true,name-canonical=true,push=true
+          outputs: |
+            type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=registry.gitlab.com/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             RELEASETAG=${{ needs.prepare-and-test.outputs.release_tag }}
             APPNAME=${{ needs.prepare-and-test.outputs.app_name }}
@@ -298,7 +302,11 @@ jobs:
         with:
           context: .
           platforms: linux/arm64
-          outputs: type=image,name=${{ needs.prepare-and-test.outputs.tag_names }},push-by-digest=true,name-canonical=true,push=true
+          outputs: |
+            type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=registry.gitlab.com/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             RELEASETAG=${{ needs.prepare-and-test.outputs.release_tag }}
             APPNAME=${{ needs.prepare-and-test.outputs.app_name }}
