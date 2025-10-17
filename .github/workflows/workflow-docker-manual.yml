@@ -113,6 +113,30 @@ jobs:
           echo "[debug] Generated app name is '${app_name}'"
           echo "app_name=$app_name" >> $GITHUB_OUTPUT
         id: generate_app_name
+      - name: Generate tag names
+        shell: bash
+        run: |
+          # Define registries
+          registries=(
+            "${{ github.repository }}"
+            "quay.io/${{ github.repository }}"
+            "ghcr.io/${{ github.repository }}"
+            "registry.gitlab.com/${{ github.repository }}"
+          )
+
+          # Construct tag names
+          tag_names=""
+          for registry in "${registries[@]}"; do
+            tag_names+="${registry}:${{ inputs.tags }}, "
+          done
+
+          # Remove trailing comma and space
+          tag_names="${tag_names%, }"
+
+          # Output tag names
+          echo "[debug] Constructed tag names: ${tag_names}"
+          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
+        id: generate_tag_names
       - name: Remove unnecessary directories to free up space
         run: |
           sudo rm -rf /usr/local/.ghcup
@@ -180,30 +204,6 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
-      - name: Generate tag names
-        shell: bash
-        run: |
-          # Define registries
-          registries=(
-            "${{ github.repository }}"
-            "quay.io/${{ github.repository }}"
-            "ghcr.io/${{ github.repository }}"
-            "registry.gitlab.com/${{ github.repository }}"
-          )
-
-          # Construct tag names
-          tag_names=""
-          for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ inputs.tags }}, "
-          done
-
-          # Remove trailing comma and space
-          tag_names="${tag_names%, }"
-
-          # Output tag names
-          echo "[debug] Constructed tag names: ${tag_names}"
-          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
-        id: generate_tag_names
 
   # Build arm64 image
   build-arm64:
