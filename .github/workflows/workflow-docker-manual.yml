@@ -321,7 +321,12 @@ jobs:
           fi
 
           # Showing all tags
-          echo "[debug] Tags to process: '${TAG_NAMES}'"
+          if [[ -z "${TAG_NAMES}" ]]; then
+            echo "[error] No tags to process"
+            exit 1
+          else
+            echo "[debug] Tags to process: '${TAG_NAMES}'"
+          fi
 
           # Show available digests
           echo "[debug] Available digests:"

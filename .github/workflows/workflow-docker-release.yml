@@ -356,13 +356,18 @@ jobs:
           IFS=',' read -ra TAG_ARRAY <<< "${TAG_NAMES}"
 
           # Check if we have any digests
-          if [ -z "$(ls -A .)" ]; then
-            echo "[error] No digests found!"
+          if [[ -z "$(ls -A .)" ]]; then
+            echo "[error] No digests found"
             exit 1
           fi
 
           # Showing all tags
-          echo "[debug] Tags to process: '${TAG_NAMES}'"
+          if [[ -z "${TAG_NAMES}" ]]; then
+            echo "[error] No tags to process"
+            exit 1
+          else
+            echo "[debug] Tags to process: '${TAG_NAMES}'"
+          fi
 
           # Show available digests
           echo "[debug] Available digests:"
