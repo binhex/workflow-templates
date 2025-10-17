@@ -48,6 +48,7 @@ jobs:
       test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
       app_name: ${{ steps.generate_app_name.outputs.app_name }}
       tag_names: ${{ steps.generate_tag_names.outputs.tag_names }}
+      simple_test: ${{ steps.generate_tag_names.outputs.simple_test }}
       amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
     steps:
       - name: Checkout
@@ -146,9 +147,15 @@ jobs:
           echo "[debug] github.repository: '${{ github.repository }}'"
           echo "[debug] inputs.tags: '${{ inputs.tags }}'"
           
+          # Simple test - just set a basic value
+          simple_test="TESTING123"
+          echo "simple_test=${simple_test}" >> $GITHUB_OUTPUT
+          echo "[debug] Set simple_test to: ${simple_test}"
+          
           # Check if inputs.tags is empty
           if [ -z "${{ inputs.tags }}" ]; then
             echo "[error] inputs.tags is empty!"
+            echo "tag_names=ERROR_EMPTY_TAGS" >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -185,10 +192,12 @@ jobs:
         shell: bash
         run: |
           echo "[debug] Verifying tag names output..."
+          echo "[debug] simple_test from step: '${{ steps.generate_tag_names.outputs.simple_test }}'"
           echo "[debug] tag_names from step: '${{ steps.generate_tag_names.outputs.tag_names }}'"
           if [ -z "${{ steps.generate_tag_names.outputs.tag_names }}" ]; then
             echo "[error] tag_names output is empty after generation step!"
             echo "[error] This indicates the generate_tag_names step failed to produce output"
+            echo "[error] But simple_test is: '${{ steps.generate_tag_names.outputs.simple_test }}'"
             exit 1
           fi
           echo "[debug] Tag names verification passed"
@@ -304,6 +313,16 @@ jobs:
       - build-arm64
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
     steps:
+      - name: Debug job inputs and needs outputs  
+        shell: bash
+        run: |
+          echo "[debug] === Job Debug Information ==="
+          echo "[debug] prepare-build-amd64-test needs outputs:"
+          echo "[debug] - tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
+          echo "[debug] - simple_test: '${{ needs.prepare-build-amd64-test.outputs.simple_test }}'"
+          echo "[debug] All needs outcomes:"
+          echo "[debug] - prepare-build-amd64-test: ${{ needs.prepare-build-amd64-test.result }}"
+          echo "[debug] - build-arm64: ${{ needs.build-arm64.result }}"
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
