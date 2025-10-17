@@ -145,6 +145,12 @@ jobs:
           echo "[debug] Starting tag name generation..."
           echo "[debug] github.repository: '${{ github.repository }}'"
           echo "[debug] inputs.tags: '${{ inputs.tags }}'"
+          
+          # Check if inputs.tags is empty
+          if [ -z "${{ inputs.tags }}" ]; then
+            echo "[error] inputs.tags is empty!"
+            exit 1
+          fi
 
           # Define registries
           registries=(
@@ -175,6 +181,17 @@ jobs:
           echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
           echo "[debug] Tag name generation complete."
         id: generate_tag_names
+      - name: Verify tag names were generated
+        shell: bash
+        run: |
+          echo "[debug] Verifying tag names output..."
+          echo "[debug] tag_names from step: '${{ steps.generate_tag_names.outputs.tag_names }}'"
+          if [ -z "${{ steps.generate_tag_names.outputs.tag_names }}" ]; then
+            echo "[error] tag_names output is empty after generation step!"
+            echo "[error] This indicates the generate_tag_names step failed to produce output"
+            exit 1
+          fi
+          echo "[debug] Tag names verification passed"
       - name: Build and push final amd64 images to all registries
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
