@@ -139,6 +139,30 @@ jobs:
           git_clone_scripts_repo="https://github.com/binhex/scripts.git"
           git clone "${git_clone_scripts_repo}" "${git_clone_scripts_dest}"
           "${git_clone_scripts_dest}/scripts/docker/testrunner.sh" --app-name ${{ steps.generate_app_name.outputs.app_name }} --image-name "ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
+      - name: Generate tag names
+        shell: bash
+        run: |
+          # Define registries
+          registries=(
+            "${{ github.repository }}"
+            "quay.io/${{ github.repository }}"
+            "ghcr.io/${{ github.repository }}"
+            "registry.gitlab.com/${{ github.repository }}"
+          )
+
+          # Construct tag names
+          tag_names=""
+          for registry in "${registries[@]}"; do
+            tag_names+="${registry}:${{ inputs.tags }}, "
+          done
+
+          # Remove trailing comma and space
+          tag_names="${tag_names%, }"
+
+          # Output tag names
+          echo "[debug] Constructed tag names: ${tag_names}"
+          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
+        id: generate_tag_names
       - name: Build and push final amd64 images to all registries
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
@@ -180,30 +204,6 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
-      - name: Generate tag names
-        shell: bash
-        run: |
-          # Define registries
-          registries=(
-            "${{ github.repository }}"
-            "quay.io/${{ github.repository }}"
-            "ghcr.io/${{ github.repository }}"
-            "registry.gitlab.com/${{ github.repository }}"
-          )
-
-          # Construct tag names
-          tag_names=""
-          for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ inputs.tags }}, "
-          done
-
-          # Remove trailing comma and space
-          tag_names="${tag_names%, }"
-
-          # Output tag names
-          echo "[debug] Constructed tag names: ${tag_names}"
-          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
-        id: generate_tag_names
 
   # Build arm64 image
   build-arm64:
