@@ -146,16 +146,33 @@ jobs:
           echo "[debug] Starting tag name generation..."
           echo "[debug] github.repository: '${{ github.repository }}'"
           echo "[debug] inputs.tags: '${{ inputs.tags }}'"
-          
+          echo "[debug] GITHUB_OUTPUT file: '$GITHUB_OUTPUT'"
+
+          # Check GITHUB_OUTPUT file exists and is writable
+          if [ ! -f "$GITHUB_OUTPUT" ]; then
+            echo "[error] GITHUB_OUTPUT file does not exist: $GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ ! -w "$GITHUB_OUTPUT" ]; then
+            echo "[error] GITHUB_OUTPUT file is not writable: $GITHUB_OUTPUT"
+            exit 1
+          fi
+
           # Simple test - just set a basic value
           simple_test="TESTING123"
-          echo "simple_test=${simple_test}" >> $GITHUB_OUTPUT
-          echo "[debug] Set simple_test to: ${simple_test}"
-          
+          echo "[debug] Setting simple_test to: ${simple_test}"
+          {
+            echo "simple_test=${simple_test}"
+          } >> "$GITHUB_OUTPUT"
+          echo "[debug] Written simple_test to GITHUB_OUTPUT"
+
           # Check if inputs.tags is empty
           if [ -z "${{ inputs.tags }}" ]; then
             echo "[error] inputs.tags is empty!"
-            echo "tag_names=ERROR_EMPTY_TAGS" >> $GITHUB_OUTPUT
+            {
+              echo "tag_names=ERROR_EMPTY_TAGS"
+            } >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
@@ -184,23 +201,40 @@ jobs:
 
           # Output tag names
           echo "[debug] Final constructed tag names: '${tag_names}'"
-          echo "[debug] Writing to GITHUB_OUTPUT..."
-          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
+          echo "[debug] Writing tag_names to GITHUB_OUTPUT..."
+          {
+            echo "tag_names=${tag_names}"
+          } >> "$GITHUB_OUTPUT"
           echo "[debug] Tag name generation complete."
+
+          # Verify what was written
+          echo "[debug] Contents of GITHUB_OUTPUT after writing:"
+          cat "$GITHUB_OUTPUT"
         id: generate_tag_names
       - name: Verify tag names were generated
         shell: bash
         run: |
           echo "[debug] Verifying tag names output..."
-          echo "[debug] simple_test from step: '${{ steps.generate_tag_names.outputs.simple_test }}'"
-          echo "[debug] tag_names from step: '${{ steps.generate_tag_names.outputs.tag_names }}'"
-          if [ -z "${{ steps.generate_tag_names.outputs.tag_names }}" ]; then
-            echo "[error] tag_names output is empty after generation step!"
-            echo "[error] This indicates the generate_tag_names step failed to produce output"
-            echo "[error] But simple_test is: '${{ steps.generate_tag_names.outputs.simple_test }}'"
+          echo "[debug] All step outputs from generate_tag_names:"
+          echo "[debug] - simple_test: '${{ steps.generate_tag_names.outputs.simple_test }}'"
+          echo "[debug] - tag_names: '${{ steps.generate_tag_names.outputs.tag_names }}'"
+
+          # Test the step output mechanism itself
+          if [ -z "${{ steps.generate_tag_names.outputs.simple_test }}" ]; then
+            echo "[error] CRITICAL: simple_test output is empty - step output mechanism is broken!"
+            echo "[error] This means the GITHUB_OUTPUT file writing is not working"
             exit 1
           fi
-          echo "[debug] Tag names verification passed"
+
+          echo "[debug] Step output mechanism is working (simple_test = '${{ steps.generate_tag_names.outputs.simple_test }}')"
+
+          if [ -z "${{ steps.generate_tag_names.outputs.tag_names }}" ]; then
+            echo "[error] tag_names output is empty after generation step!"
+            echo "[error] This indicates the tag generation logic failed"
+            echo "[error] But step outputs are working since simple_test = '${{ steps.generate_tag_names.outputs.simple_test }}'"
+            exit 1
+          fi
+          echo "[debug] Tag names verification passed: '${{ steps.generate_tag_names.outputs.tag_names }}'"
       - name: Build and push final amd64 images to all registries
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
@@ -313,7 +347,7 @@ jobs:
       - build-arm64
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
     steps:
-      - name: Debug job inputs and needs outputs  
+      - name: Debug job inputs and needs outputs
         shell: bash
         run: |
           echo "[debug] === Job Debug Information ==="
