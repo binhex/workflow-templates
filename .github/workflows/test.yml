@@ -1,98 +1,375 @@
-name: ci
+name: workflow-docker-manual
 
 on:
-  push:
+  workflow_call:
+    inputs:
+      tags:
+        required: true
+        type: string
+      platforms:
+        required: false
+        type: string
+        default: 'linux/amd64'
+      checkout_ref:
+        required: false
+        type: string
+        default: ''
+    secrets:
+      CR_PAT:
+        required: true
+      DOCKERHUB_PASSWORD:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+      DOCKERHUB_USERNAME:
+        required: true
+      EMAIL_ADDRESS:
+        required: true
+      EMAIL_PASSWORD:
+        required: true
+      GITLAB_TOKEN:
+        required: true
+      GITLAB_USERNAME:
+        required: true
+      IMMORTALITY_PAT:
+        required: true
+      QUAY_TOKEN:
+        required: true
+      QUAY_USERNAME:
+        required: true
+      TDB_PAT:
+        required: true
 
 env:
-  REGISTRY_IMAGE: user/app
+  REGISTRY_IMAGE: ${{ github.repository }}
 
 jobs:
-  build:
+  # Prepare shared metadata and run tests on amd64
+  prepare-build-amd64-test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
+    outputs:
+      test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
+      app_name: ${{ steps.generate_app_name.outputs.app_name }}
+      tag_names: ${{ steps.generate_tag_names.outputs.tag_names }}
+      amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
     steps:
-      - name: Prepare
-        run: |
-          platform=${{ matrix.platform }}
-          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          images: ${{ env.REGISTRY_IMAGE }}
+          ref: ${{ inputs.checkout_ref || github.ref }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Set up QEMU
+      - name: Set up QEMU for multi-arch support
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push by digest
-        id: build
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Login to GitLab
+        uses: docker/login-action@v3
+        with:
+          registry: registry.gitlab.com
+          username: ${{ secrets.GITLAB_USERNAME }}
+          password: ${{ secrets.GITLAB_TOKEN }}
+
+      - name: Sync GitHub README.md with Docker Hub
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }} # NOTE: This MUST be the password NOT the token
+          repository: ${{ github.repository }}
+          short-description: ${{ github.event.repository.description }}
+
+      - name: DEBUG Show Runners environment
+        shell: bash
+        run: |
+            export
+
+      - name: DEBUG Show input parameters
+        shell: bash
+        run: |
+            echo "[debug] Input tags: '${{ inputs.tags }}'"
+            echo "[debug] Input platforms: '${{ inputs.platforms }}'"
+            echo "[debug] Input checkout_ref: '${{ inputs.checkout_ref }}'"
+            echo "[debug] Actual checkout ref: '${{ inputs.checkout_ref || github.ref }}'"
+
+      - name: Generate temporary tag name
+        shell: bash
+        run: |
+          test_tag=$(date +%Y%m%d%H%M%S)
+          echo "[debug] Generated test tag name is '${test_tag}'"
+          echo "test_tag=$test_tag" >> $GITHUB_OUTPUT
+        id: generate_temporary_tag_name
+
+      - name: Generate app name
+        shell: bash
+        run: |
+          app_name=$(echo "${GITHUB_REPOSITORY}" | grep -P -o -m 1 '(?<=/arch-).*')
+          echo "[debug] Generated app name is '${app_name}'"
+          echo "app_name=$app_name" >> $GITHUB_OUTPUT
+        id: generate_app_name
+
+      - name: Generate tag names
+        shell: bash
+        run: |
+          # Define registries
+          registries=(
+            "${{ github.repository }}"
+            "quay.io/${{ github.repository }}"
+            "ghcr.io/${{ github.repository }}"
+            "registry.gitlab.com/${{ github.repository }}"
+          )
+
+          # Construct tag names
+          tag_names=""
+          for registry in "${registries[@]}"; do
+            tag_names+="${registry}:${{ inputs.tags }}, "
+          done
+
+          # Remove trailing comma and space
+          tag_names="${tag_names%, }"
+
+          # Output tag names
+          echo "[debug] Constructed tag names: ${tag_names}"
+          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
+        id: generate_tag_names
+
+      - name: Remove unnecessary directories to free up space
+        run: |
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+
+      - name: Build amd64 image for testing
         uses: docker/build-push-action@v6
         with:
-          platforms: ${{ matrix.platform }}
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}
+          build-args: |
+            RELEASETAG=${{ inputs.tags }}
+            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
+        id: build-amd64-test
+
+      - name: Run tests using previously built image
+        shell: bash
+        run: |
+          git_clone_scripts_dest="/tmp/scripts"
+          git_clone_scripts_repo="https://github.com/binhex/scripts.git"
+          git clone "${git_clone_scripts_repo}" "${git_clone_scripts_dest}"
+          "${git_clone_scripts_dest}/scripts/docker/testrunner.sh" --app-name ${{ steps.generate_app_name.outputs.app_name }} --image-name "ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
+
+      - name: Build and push final amd64 images to all registries
+        if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.generate_tag_names.outputs.tag_names }}
+          build-args: |
+            RELEASETAG=${{ inputs.tags }}
+            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
+        id: build-final-amd64-only
+
+      - name: Build and push amd64 images by digest for multi-arch
+        if: contains(inputs.platforms, 'linux/arm64')
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ env.REGISTRY_IMAGE }}
-          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          outputs: |
+            type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=registry.gitlab.com/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            RELEASETAG=${{ inputs.tags }}
+            APPNAME=${{ steps.generate_app_name.outputs.app_name }}
+        id: build-amd64-digest
+
+      - name: Export amd64 digest for multi-arch
+        if: contains(inputs.platforms, 'linux/arm64')
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build-amd64-digest.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload amd64 digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Build arm64 image
+  build-arm64:
+    runs-on: ubuntu-24.04-arm
+    needs: prepare-build-amd64-test
+    if: contains(inputs.platforms, 'linux/arm64')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Login to GitLab
+        uses: docker/login-action@v3
+        with:
+          registry: registry.gitlab.com
+          username: ${{ secrets.GITLAB_USERNAME }}
+          password: ${{ secrets.GITLAB_TOKEN }}
+
+      - name: Build and push arm64 image
+        id: build-arm64
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          labels: ${{ needs.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY_IMAGE }}
+          outputs: |
+            type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=registry.gitlab.com/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            RELEASETAG=${{ inputs.tags }}
+            APPNAME=${{ needs.prepare-build-amd64-test.outputs.app_name }}
 
       - name: Export digest
         run: |
           mkdir -p ${{ runner.temp }}/digests
-          digest="${{ steps.build.outputs.digest }}"
+          digest="${{ steps.build-arm64.outputs.digest }}"
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ env.PLATFORM_PAIR }}
+          name: digests-arm64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
 
-  merge:
+  # Merge manifests and push final multi-arch image
+  merge-push:
     runs-on: ubuntu-latest
     needs:
-      - build
+      - build-arm64
+      - prepare-build-amd64-test
+    if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
+    env:
+      TAG_NAMES: ${{ github.repository }}:${{ inputs.tags }}, quay.io/${{ github.repository }}:${{ inputs.tags }}, ghcr.io/${{ github.repository }}:${{ inputs.tags }}, registry.gitlab.com/${{ github.repository }}:${{ inputs.tags }}
     steps:
+      - name: Debug TAG_NAMES
+        run: |
+          echo "[debug] TAG_NAMES environment variable: '${TAG_NAMES}'"
+          echo "[debug] Direct output access: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
+          echo "[debug] All outputs from prepare-build-amd64-test:"
+          echo "  test_tag: '${{ needs.prepare-build-amd64-test.outputs.test_tag }}'"
+          echo "  app_name: '${{ needs.prepare-build-amd64-test.outputs.app_name }}'"
+          echo "  tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
+          echo "  amd64_digest: '${{ needs.prepare-build-amd64-test.outputs.amd64_digest }}'"
+
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-*
+          pattern: digests-*-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
           merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Login to GitLab
+        uses: docker/login-action@v3
+        with:
+          registry: registry.gitlab.com
+          username: ${{ secrets.GITLAB_USERNAME }}
+          password: ${{ secrets.GITLAB_TOKEN }}
 
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY_IMAGE }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+          tags: ${{ needs.prepare-build-amd64-test.outputs.tag_names }}
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
