@@ -364,23 +364,54 @@ jobs:
           username: ${{ secrets.GITLAB_USERNAME }}
           password: ${{ secrets.GITLAB_TOKEN }}
 
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY_IMAGE }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+          # Check if we have any digests
+          if [ -z "$(ls -A .)" ]; then
+            echo "[error] No digests found!"
+            exit 1
+          fi
 
-      - name: Inspect image
+          # Show available digests
+          echo "[debug] Available digests:"
+          ls -la
+
+          # Define registries that match the build outputs
+          registries=(
+            "${{ github.repository }}"
+            "ghcr.io/${{ github.repository }}"
+            "quay.io/${{ github.repository }}"
+            "registry.gitlab.com/${{ github.repository }}"
+          )
+
+          # Process each registry to create multi-arch manifest
+          for registry in "${registries[@]}"; do
+            echo "[debug] Processing registry: $registry"
+            
+            # Create manifest list using all available digests for this registry
+            echo "[debug] Creating manifest for: ${registry}:${{ inputs.tags }}"
+            
+            # Create manifest list and capture output to get the manifest list digest
+            output=$(docker buildx imagetools create \
+              --tag "${registry}:${{ inputs.tags }}" \
+              $(printf "${registry}@sha256:%s " *) 2>&1)
+            
+            echo "$output"
+            
+            # Extract and display manifest list digest
+            manifest_list_digest=$(echo "$output" | grep -o "exporting manifest list sha256:[a-f0-9]\{64\}" | grep -o "sha256:[a-f0-9]\{64\}")
+            if [ -n "$manifest_list_digest" ]; then
+              echo "[info] Manifest list digest for ${registry}:${{ inputs.tags }}: $manifest_list_digest"
+            else
+              echo "[warning] Could not extract manifest list digest from output for $registry"
+            fi
+          done
+
+      - name: Inspect images
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+          echo "[debug] Inspecting created multi-arch images:"
+          docker buildx imagetools inspect ${{ github.repository }}:${{ inputs.tags }}
+          docker buildx imagetools inspect ghcr.io/${{ github.repository }}:${{ inputs.tags }}
+          docker buildx imagetools inspect quay.io/${{ github.repository }}:${{ inputs.tags }}
+          docker buildx imagetools inspect registry.gitlab.com/${{ github.repository }}:${{ inputs.tags }}
