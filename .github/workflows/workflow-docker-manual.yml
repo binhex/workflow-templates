@@ -223,15 +223,15 @@ jobs:
       - name: Export amd64 digest for multi-arch
         if: contains(inputs.platforms, 'linux/arm64')
         run: |
-          mkdir -p /tmp/digests
+          mkdir -p ${{ runner.temp }}/digests
           digest="${{ steps.build-amd64-digest.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload amd64 digest
         uses: actions/upload-artifact@v4
         with:
           name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/digests/*
+          path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
 
