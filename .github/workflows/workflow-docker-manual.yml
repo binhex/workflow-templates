@@ -351,17 +351,17 @@ jobs:
           # Process each registry to create multi-arch manifest
           for registry in "${registries[@]}"; do
             echo "[debug] Processing registry: $registry"
-            
+
             # Create manifest list using all available digests for this registry
             echo "[debug] Creating manifest for: ${registry}:${{ inputs.tags }}"
-            
+
             # Create manifest list and capture output to get the manifest list digest
             output=$(docker buildx imagetools create \
               --tag "${registry}:${{ inputs.tags }}" \
               $(printf "${registry}@sha256:%s " *) 2>&1)
-            
+
             echo "$output"
-            
+
             # Extract and display manifest list digest
             manifest_list_digest=$(echo "$output" | grep -o "exporting manifest list sha256:[a-f0-9]\{64\}" | grep -o "sha256:[a-f0-9]\{64\}")
             if [ -n "$manifest_list_digest" ]; then
