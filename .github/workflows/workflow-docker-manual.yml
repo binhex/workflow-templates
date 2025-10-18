@@ -209,6 +209,7 @@ jobs:
           context: .
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
+          # note do NOT specify the tag name here, you are pushing by digest not tag
           tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -283,6 +284,7 @@ jobs:
           context: .
           platforms: linux/arm64
           labels: ${{ needs.meta.outputs.labels }}
+          # note do NOT specify the tag name here, you are pushing by digest not tag
           tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -369,8 +371,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY_IMAGE }}
+          # note key name 'value' must be set to this for type raw
           tags: |
-            type=raw,tag=${{ inputs.tags }}
+            type=raw,value=${{ inputs.tags }}
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
