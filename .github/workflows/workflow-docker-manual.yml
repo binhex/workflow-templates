@@ -181,6 +181,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
+          tags: ${{ steps.generate_tag_names.outputs.tag_names }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -358,7 +359,7 @@ jobs:
             # Create manifest list and capture output to get the manifest list digest
             output=$(docker buildx imagetools create \
               --tag "${registry}:${{ inputs.tags }}" \
-              $(printf "${registry}@sha256:%s " *) 2>&1)
+              $(printf "${registry}@sha256:%s " *))
 
             echo "$output"
 
