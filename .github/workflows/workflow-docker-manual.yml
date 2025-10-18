@@ -216,7 +216,6 @@ jobs:
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
-            type=image,name=registry.gitlab.com/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
@@ -291,7 +290,6 @@ jobs:
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
-            type=image,name=registry.gitlab.com/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ needs.prepare-build-amd64-test.outputs.app_name }}
@@ -363,7 +361,6 @@ jobs:
             ${{ github.repository }}
             quay.io/${{ github.repository }}
             ghcr.io/${{ github.repository }}
-            registry.gitlab.com/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
           tags: |
             type=raw,value=${{ inputs.tags }}
