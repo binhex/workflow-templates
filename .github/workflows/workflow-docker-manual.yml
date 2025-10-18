@@ -317,19 +317,7 @@ jobs:
       - build-arm64
       - prepare-build-amd64-test
     if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
-    env:
-      TAG_NAMES: ${{ github.repository }}:${{ inputs.tags }}, quay.io/${{ github.repository }}:${{ inputs.tags }}, ghcr.io/${{ github.repository }}:${{ inputs.tags }}, registry.gitlab.com/${{ github.repository }}:${{ inputs.tags }}
     steps:
-      - name: Debug TAG_NAMES
-        run: |
-          echo "[debug] TAG_NAMES environment variable: '${TAG_NAMES}'"
-          echo "[debug] Direct output access: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
-          echo "[debug] All outputs from prepare-build-amd64-test:"
-          echo "  test_tag: '${{ needs.prepare-build-amd64-test.outputs.test_tag }}'"
-          echo "  app_name: '${{ needs.prepare-build-amd64-test.outputs.app_name }}'"
-          echo "  tag_names: '${{ needs.prepare-build-amd64-test.outputs.tag_names }}'"
-          echo "  amd64_digest: '${{ needs.prepare-build-amd64-test.outputs.amd64_digest }}'"
-
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
@@ -371,7 +359,11 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.TAG_NAMES }}
+          images: |
+            ${{ github.repository }}
+            quay.io/${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+            registry.gitlab.com${{ github.repository }}
           # note key name 'value' must be set to this for type raw
           tags: |
             type=raw,value=${{ inputs.tags }}
@@ -380,8 +372,8 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.TAG_NAMES }}@sha256:%s ' *)
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.TAG_NAMES }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
