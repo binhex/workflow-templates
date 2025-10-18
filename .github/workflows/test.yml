@@ -1,3 +1,10 @@
+# Multi-architecture and branch GitHub Workflow
+#
+# This workflow builds an AMD64 Docker image, smoketests, and if defined (and tests pass) will then go onto build a ARM64
+# Docker image, once built both images will be merged together using digests.
+#
+# inspired by https://docs.docker.com/build/ci/github-actions/multi-platform/#distribute-build-across-multiple-runners
+
 name: workflow-docker-manual
 
 on:
@@ -369,7 +376,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY_IMAGE }}
-          tags: ${{ needs.prepare-build-amd64-test.outputs.tag_names }}
+          tags: ${{ inputs.tags }}
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
