@@ -209,7 +209,7 @@ jobs:
           context: .
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ github.repository }}:${{ inputs.tags }}
+          tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -283,7 +283,7 @@ jobs:
           context: .
           platforms: linux/arm64
           labels: ${{ needs.meta.outputs.labels }}
-          tags: ${{ github.repository }}:${{ inputs.tags }}
+          tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
