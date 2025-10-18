@@ -65,6 +65,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -202,6 +208,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
+          labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ github.repository }}:${{ inputs.tags }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -275,6 +282,7 @@ jobs:
         with:
           context: .
           platforms: linux/arm64
+          labels: ${{ needs.meta.outputs.labels }}
           tags: ${{ github.repository }}:${{ inputs.tags }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -356,11 +364,20 @@ jobs:
           username: ${{ secrets.GITLAB_USERNAME }}
           password: ${{ secrets.GITLAB_TOKEN }}
 
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+          tags: |
+            type=raw,tag=${{ inputs.tags }}
+
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
-          echo "[debug] Showing file digests..."
-          ls -al ${{ runner.temp }}/digests
-          exit 1
-          docker buildx imagetools create -t tonistiigi/myapp -f image1 -f image2
-          docker buildx imagetools create -t
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
