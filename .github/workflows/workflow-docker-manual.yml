@@ -363,7 +363,7 @@ jobs:
             ${{ github.repository }}
             quay.io/${{ github.repository }}
             ghcr.io/${{ github.repository }}
-            registry.gitlab.com${{ github.repository }}
+            registry.gitlab.com/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
           tags: |
             type=raw,value=${{ inputs.tags }}
