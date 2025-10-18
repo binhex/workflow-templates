@@ -124,8 +124,7 @@ jobs:
           registries=(
             "${{ github.repository }}"
             "quay.io/${{ github.repository }}"
-            "ghcr.io/${{ github.repository }}"
-          )
+            "ghcr.io/${{ github.repository }}"          )
 
           # Construct tag names
           tag_names=""
