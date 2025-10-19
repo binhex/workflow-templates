@@ -358,6 +358,10 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
+      - name: Debug Show tags
+        run: |
+          echo "Tags are '${{ needs.build-amd64-test.outputs.tag_names }}'"
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
