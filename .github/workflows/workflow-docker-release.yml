@@ -36,36 +36,50 @@ on:
       TDB_PAT:
         required: true
 
+env:
+  REGISTRY_IMAGE: ${{ github.repository }}
+
 jobs:
-  # Prepare shared metadata and run tests on amd64
-  prepare-build-amd64-test:
+  # build amd64 image and run tests
+  build-amd64-test:
     runs-on: ubuntu-latest
     outputs:
-      release_tag: ${{ steps.identify_github_release_tag_name.outputs.tag }}
       test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
       app_name: ${{ steps.generate_app_name.outputs.app_name }}
       tag_names: ${{ steps.generate_tag_names.outputs.tag_names }}
       amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.checkout_ref || github.ref }}
+
       - name: Set up QEMU for multi-arch support
         uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GitHub
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
+
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -73,6 +87,7 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
+      # note only required in this job
       - name: Sync GitHub README.md with Docker Hub
         uses: peter-evans/dockerhub-description@v4
         with:
@@ -80,28 +95,12 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }} # NOTE: This MUST be the password NOT the token
           repository: ${{ github.repository }}
           short-description: ${{ github.event.repository.description }}
+
       - name: DEBUG Show Runners environment
         shell: bash
         run: |
             export
-      - name: DEBUG Show input parameters
-        shell: bash
-        run: |
-            echo "[debug] Input tags: '${{ inputs.tags }}'"
-            echo "[debug] Input platforms: '${{ inputs.platforms }}'"
-            echo "[debug] Input checkout_ref: '${{ inputs.checkout_ref }}'"
-            echo "[debug] Actual checkout ref: '${{ inputs.checkout_ref || github.ref }}'"
-      - name: Identify GitHub Release tag name
-        # get tag name from runners environment 'GITHUB_REF_NAME' and then use bash substring
-        # to strip out '+' symbol - required due to gcr not supporting this as a tag
-        # name (docker hub does support it).
-        # note if push is NOT triggered by tag then 'GITHUB_REF_NAME' will be the branch name.
-        shell: bash
-        run: |
-            tag="${GITHUB_REF_NAME}" && echo "tag=${tag//+/-}" >> $GITHUB_OUTPUT
-            echo "[debug] Generated tag name is '${tag}'"
-            echo "tag=$tag" >> $GITHUB_OUTPUT
-        id: identify_github_release_tag_name
+
       - name: Generate temporary tag name
         shell: bash
         run: |
@@ -109,6 +108,7 @@ jobs:
           echo "[debug] Generated test tag name is '${test_tag}'"
           echo "test_tag=$test_tag" >> $GITHUB_OUTPUT
         id: generate_temporary_tag_name
+
       - name: Generate app name
         shell: bash
         run: |
@@ -116,6 +116,7 @@ jobs:
           echo "[debug] Generated app name is '${app_name}'"
           echo "app_name=$app_name" >> $GITHUB_OUTPUT
         id: generate_app_name
+
       - name: Generate tag names
         shell: bash
         run: |
@@ -123,19 +124,12 @@ jobs:
           registries=(
             "${{ github.repository }}"
             "quay.io/${{ github.repository }}"
-            "ghcr.io/${{ github.repository }}"
-          )
+            "ghcr.io/${{ github.repository }}"          )
 
           # Construct tag names
           tag_names=""
           for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ steps.identify_github_release_tag_name.outputs.tag }}, ${registry}:latest, "
-            if [[ -n "${{ steps.generate_version_tags.outputs.major_version }}" ]]; then
-              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_version }}, "
-            fi
-            if [[ -n "${{ steps.generate_version_tags.outputs.major_minor_version }}" ]]; then
-              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_minor_version }}, "
-            fi
+            tag_names+="${registry}:${{ inputs.tags }}, "
           done
 
           # Remove trailing comma and space
@@ -145,6 +139,7 @@ jobs:
           echo "[debug] Constructed tag names: ${tag_names}"
           echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
         id: generate_tag_names
+
       - name: Remove unnecessary directories to free up space
         run: |
           sudo rm -rf /usr/local/.ghcup
@@ -153,6 +148,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/boost
+
       - name: Build amd64 image for testing
         uses: docker/build-push-action@v6
         with:
@@ -161,9 +157,10 @@ jobs:
           load: true
           tags: ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}
           build-args: |
-            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
         id: build-amd64-test
+
       - name: Run tests using previously built image
         shell: bash
         run: |
@@ -171,27 +168,7 @@ jobs:
           git_clone_scripts_repo="https://github.com/binhex/scripts.git"
           git clone "${git_clone_scripts_repo}" "${git_clone_scripts_dest}"
           "${git_clone_scripts_dest}/scripts/docker/testrunner.sh" --app-name ${{ steps.generate_app_name.outputs.app_name }} --image-name "ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
-      - name: Generate major and major-minor version tag names
-        shell: bash
-        run: |
-          # Get release tag name
-          release_version="${{ steps.identify_github_release_tag_name.outputs.tag }}"
 
-          # Validate and construct major and major-minor versions
-          if [[ "${release_version}" =~ ^(v?[0-9]+)\.([0-9]+)\.[0-9]+ ]]; then
-            major_version="${BASH_REMATCH[1]}"
-            minor_version="${BASH_REMATCH[2]}"
-            major_minor_version="${major_version}.${minor_version}"
-            echo "[debug] Constructed major version tag name: ${major_version}"
-            echo "[debug] Constructed major-minor version tag name: ${major_minor_version}"
-            echo "major_version=${major_version}" >> $GITHUB_OUTPUT
-            echo "major_minor_version=${major_minor_version}" >> $GITHUB_OUTPUT
-          else
-            echo "[warn] Release tag '${release_version}' does not include 3 or more octets, major and major-minor version tag names not constructed."
-            echo "major_version=" >> $GITHUB_OUTPUT
-            echo "major_minor_version=" >> $GITHUB_OUTPUT
-          fi
-        id: generate_version_tags
       - name: Build and push final amd64 images to all registries
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
@@ -201,64 +178,70 @@ jobs:
           push: true
           tags: ${{ steps.generate_tag_names.outputs.tag_names }}
           build-args: |
-            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
         id: build-final-amd64-only
+
       - name: Build and push amd64 images by digest for multi-arch
         if: contains(inputs.platforms, 'linux/arm64')
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
-          push: true
+          labels: ${{ steps.meta.outputs.labels }}
+          # note do NOT specify the tag name here, you are pushing by digest not tag
+          tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
-
           build-args: |
-            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
         id: build-amd64-digest
+
       - name: Export amd64 digest for multi-arch
         if: contains(inputs.platforms, 'linux/arm64')
         run: |
-          mkdir -p /tmp/digests
+          mkdir -p ${{ runner.temp }}/digests
           digest="${{ steps.build-amd64-digest.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
       - name: Upload amd64 digest
-        if: contains(inputs.platforms, 'linux/arm64')
         uses: actions/upload-artifact@v4
         with:
-          name: digests-amd64
-          path: /tmp/digests/*
+          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
-
 
   # Build arm64 image
   build-arm64:
     runs-on: ubuntu-24.04-arm
-    needs: prepare-build-amd64-test
+    needs: build-amd64-test
     if: contains(inputs.platforms, 'linux/arm64')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.checkout_ref || github.ref }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GitHub
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
+
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -272,56 +255,62 @@ jobs:
         with:
           context: .
           platforms: linux/arm64
+          labels: ${{ needs.meta.outputs.labels }}
+          # note do NOT specify the tag name here, you are pushing by digest not tag
+          tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
-
           build-args: |
-            RELEASETAG=${{ needs.prepare-build-amd64-test.outputs.release_tag }}
-            APPNAME=${{ needs.prepare-build-amd64-test.outputs.app_name }}
+            RELEASETAG=${{ inputs.tags }}
+            APPNAME=${{ needs.build-amd64-test.outputs.app_name }}
+
       - name: Export digest
         run: |
-          mkdir -p /tmp/digests
+          mkdir -p ${{ runner.temp }}/digests
           digest="${{ steps.build-arm64.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-arm64
-          path: /tmp/digests/*
+          name: digests-arm64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
 
-  # Merge manifests and push final multi-arch image
+  # merge manifests and push final multi-arch image
   merge-push:
     runs-on: ubuntu-latest
     needs:
       - build-arm64
-      - prepare-build-amd64-test
-    if: contains(inputs.platforms, 'linux/arm64') && always() && needs.prepare-build-amd64-test.result == 'success'
-    env:
-      TAG_NAMES: ${{ needs.prepare-build-amd64-test.outputs.tag_names }}
+      - build-amd64-test
+    if: contains(inputs.platforms, 'linux/arm64') && always() && needs.build-amd64-test.result == 'success'
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
-          pattern: digests-*
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
           merge-multiple: true
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GitHub
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
+
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -329,36 +318,26 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # note 'images' format is <registry>/<owner>/<image name>
+          images: |
+            ${{ github.repository }}
+            quay.io/${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+          # note key name 'value' must be set to this for type raw
+          tags: |
+            type=raw,value=${{ inputs.tags }}
+
+      # finally create manifest for specified tag
       - name: Create manifest list and push
-        working-directory: /tmp/digests
+        working-directory: ${{ runner.temp }}/digests
         run: |
-          # Convert tag names to array for processing
-          IFS=',' read -ra TAG_ARRAY <<< "${TAG_NAMES}"
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
 
-          # Check if we have any digests
-          if [[ -z "$(ls -A .)" ]]; then
-            echo "[error] No digests found"
-            exit 1
-          fi
-
-          # Showing all tags
-          if [[ -z "${TAG_NAMES}" ]]; then
-            echo "[error] No tags to process"
-            exit 1
-          else
-            echo "[debug] Tags to process: '${TAG_NAMES}'"
-          fi
-
-          # Show available digests
-          echo "[debug] Available digests:"
-          ls -la
-
-          # Process each tag
-          for tag in "${TAG_ARRAY[@]}"; do
-            # Trim whitespace
-            tag=$(echo "$tag" | xargs)
-            echo "[debug] Processing tag: $tag"
-
-            # Create manifest list with all available digests for this tag
-            docker buildx imagetools create $(printf "$tag@sha256:%s " *)
-          done
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
