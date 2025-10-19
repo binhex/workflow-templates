@@ -162,24 +162,22 @@ jobs:
             "quay.io/${{ github.repository }}"
             "ghcr.io/${{ github.repository }}"          )
 
-          # Construct tag names
+          # Construct tag names with no registry
+          tag_names="${{ steps.identify_github_release_tag_name.outputs.release_tag }}, ${{ steps.generate_version_tags.outputs.major_version }}, ${{ steps.generate_version_tags.outputs.major_minor_version }}, latest"
+
+          # Construct tag names for each registry
           registry_tag_names=""
-          tag_names=""
           for registry in "${registries[@]}"; do
-            tag_names+="${{ steps.identify_github_release_tag_name.outputs.release_tag }}, ${registry}:latest, "
             registry_tag_names+="${registry}:${{ steps.identify_github_release_tag_name.outputs.release_tag }}, ${registry}:latest, "
             if [[ -n "${{ steps.generate_version_tags.outputs.major_version }}" ]]; then
-              tag_names+="${{ steps.generate_version_tags.outputs.major_version }}, "
               registry_tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_version }}, "
             fi
             if [[ -n "${{ steps.generate_version_tags.outputs.major_minor_version }}" ]]; then
-              tag_names+="${{ steps.generate_version_tags.outputs.major_minor_version }}, "
               registry_tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_minor_version }}, "
             fi
           done
 
           # Remove trailing comma and space
-          tag_names="${tag_names%, }"
           registry_tag_names="${registry_tag_names%, }"
 
           echo "[debug] Constructed tag names: ${tag_names}"
@@ -370,12 +368,11 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - env:
-          TAG_NAMES: ${{needs.build-amd64-test.outputs.tag_names}}
+          TAG_NAMES: ${{ needs.build-amd64-test.outputs.tag_names }}
         run: |
-          echo "Tags are '$TAG_NAMES'"
+          echo "Tag names are '$TAG_NAMES'"
 
-      - env:
-          TAG_NAMES: ${{needs.build-amd64-test.outputs.tag_names}}
+      - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -386,7 +383,7 @@ jobs:
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
           tags: |
-            type=raw,value=$TAG_NAMES
+            type=raw,value=${{ needs.build-amd64-test.outputs.tag_names }}
 
       # finally create manifest for specified tag
       - name: Create manifest list and push
