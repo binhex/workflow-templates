@@ -163,7 +163,7 @@ jobs:
             "ghcr.io/${{ github.repository }}"          )
 
           # Construct tag names with no registry
-          tag_names="${{ steps.identify_github_release_tag_name.outputs.release_tag }}, ${{ steps.generate_version_tags.outputs.major_version }}, ${{ steps.generate_version_tags.outputs.major_minor_version }}, latest"
+          tag_names="${{ steps.identify_github_release_tag_name.outputs.release_tag }} ${{ steps.generate_version_tags.outputs.major_version }} ${{ steps.generate_version_tags.outputs.major_minor_version }} latest"
 
           # Construct tag names for each registry
           registry_tag_names=""
