@@ -162,8 +162,10 @@ jobs:
             "quay.io/${{ github.repository }}"
             "ghcr.io/${{ github.repository }}"          )
 
-          # Construct tag names with no registry
-          tag_names="${{ steps.identify_github_release_tag_name.outputs.release_tag }} ${{ steps.generate_version_tags.outputs.major_version }} ${{ steps.generate_version_tags.outputs.major_minor_version }} latest"
+          # Construct tag names with no registry (comma-separated for Docker metadata action)
+          tag_names="${{ steps.identify_github_release_tag_name.outputs.release_tag }},${{ steps.generate_version_tags.outputs.major_version }},${{ steps.generate_version_tags.outputs.major_minor_version }},latest"
+          # Remove any empty values and extra commas
+          tag_names=$(echo "$tag_names" | sed 's/,,*/,/g' | sed 's/^,\|,$//g')
 
           # Construct tag names for each registry
           registry_tag_names=""
@@ -377,7 +379,7 @@ jobs:
             quay.io/${{ github.repository }}
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
-          # note 'tag_names' format is '<tag1>, <tag2>...' no registry
+          # note 'tag_names' format is comma-separated for single type=raw value
           tags: |
             type=raw,value=${{ needs.build-amd64-test.outputs.tag_names }}
 
