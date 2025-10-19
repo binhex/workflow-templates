@@ -44,6 +44,7 @@ jobs:
   build-amd64-test:
     runs-on: ubuntu-latest
     outputs:
+      # create outputs for use in other jobs
       test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
       app_name: ${{ steps.generate_app_name.outputs.app_name }}
       release_tag: ${{ steps.identify_github_release_tag_name.outputs.release_tag }}
@@ -51,7 +52,6 @@ jobs:
       registry_tag_names: ${{ steps.generate_registry_tag_names.outputs.registry_tag_names }}
       amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -369,11 +369,13 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - name: Debug Show tags
+      - env:
+          TAG_NAMES: ${{ needs.generate_registry_tag_names.outputs.tag_names }}
         run: |
-          echo "Tags are '${{ needs.build-amd64-test.outputs.registry_tag_names }}'"
+          echo "Tags are '${{ env.TAG_NAMES }}'"
 
-      - name: Docker meta
+      - env:
+          TAG_NAMES: ${{ needs.generate_registry_tag_names.outputs.tag_names }}
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -384,7 +386,7 @@ jobs:
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
           tags: |
-            type=raw,value=${{ needs.build-amd64-test.outputs.tag_names }}
+            type=raw,value=${{ env.TAG_NAMES }}
 
       # finally create manifest for specified tag
       - name: Create manifest list and push
