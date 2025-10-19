@@ -237,7 +237,7 @@ jobs:
           context: .
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          # note do NOT specify the tag name here, you are pushing by digest not tag
+          # note do NOT specify the tag name here, only repo name, you are pushing by digest not tag
           tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -305,7 +305,7 @@ jobs:
           context: .
           platforms: linux/arm64
           labels: ${{ needs.meta.outputs.labels }}
-          # note do NOT specify the tag name here, you are pushing by digest not tag
+          # note do NOT specify the tag name here, only the repo name, you are pushing by digest not tag
           tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -367,11 +367,6 @@ jobs:
           username: binhex+githubactions
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - env:
-          TAG_NAMES: ${{ needs.build-amd64-test.outputs.tag_names }}
-        run: |
-          echo "Tag names are '$TAG_NAMES'"
-
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -382,10 +377,10 @@ jobs:
             quay.io/${{ github.repository }}
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
+          # note 'tag_names' format is '<tag1>, <tag2>...' no registry
           tags: |
             type=raw,value=${{ needs.build-amd64-test.outputs.tag_names }}
 
-      # finally create manifest for specified tag
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
