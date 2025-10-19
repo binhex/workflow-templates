@@ -46,6 +46,7 @@ jobs:
     outputs:
       test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
       app_name: ${{ steps.generate_app_name.outputs.app_name }}
+      release_tag: ${{ steps.identify_github_release_tag_name.outputs.release_tag }}
       tag_names: ${{ steps.generate_tag_names.outputs.tag_names }}
       amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
     steps:
@@ -110,7 +111,7 @@ jobs:
         run: |
             tag="${GITHUB_REF_NAME}" && echo "tag=${tag//+/-}" >> $GITHUB_OUTPUT
             echo "[debug] Generated tag name is '${tag}'"
-            echo "tag=$tag" >> $GITHUB_OUTPUT
+            echo "release_tag=$tag" >> $GITHUB_OUTPUT
         id: identify_github_release_tag_name
 
       - name: Generate temporary tag name
@@ -133,7 +134,7 @@ jobs:
         shell: bash
         run: |
           # Get release tag name
-          release_version="${{ steps.identify_github_release_tag_name.outputs.tag }}"
+          release_version="${{ steps.identify_github_release_tag_name.outputs.release_tag }}"
 
           # Validate and construct major and major-minor versions
           if [[ "${release_version}" =~ ^(v?[0-9]+)\.([0-9]+)\.[0-9]+ ]]; then
@@ -163,7 +164,7 @@ jobs:
           # Construct tag names
           tag_names=""
           for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ steps.identify_github_release_tag_name.outputs.tag }}, ${registry}:latest, "
+            tag_names+="${registry}:${{ steps.identify_github_release_tag_name.outputs.release_tag }}, ${registry}:latest, "
             if [[ -n "${{ steps.generate_version_tags.outputs.major_version }}" ]]; then
               tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_version }}, "
             fi
@@ -197,7 +198,7 @@ jobs:
           load: true
           tags: ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}
           build-args: |
-            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.release_tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
         id: build-amd64-test
 
@@ -218,7 +219,7 @@ jobs:
           push: true
           tags: ${{ steps.generate_tag_names.outputs.tag_names }}
           build-args: |
-            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.release_tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
         id: build-final-amd64-only
 
@@ -236,7 +237,7 @@ jobs:
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            RELEASETAG=${{ inputs.tags }}
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.release_tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
         id: build-amd64-digest
 
@@ -304,7 +305,7 @@ jobs:
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            RELEASETAG=${{ inputs.tags }}
+            RELEASETAG=${{ needs.build-amd64-test.outputs.release_tag }}
             APPNAME=${{ needs.build-amd64-test.outputs.app_name }}
 
       - name: Export arm64 digest (multi arch)
