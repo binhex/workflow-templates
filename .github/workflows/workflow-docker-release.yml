@@ -248,6 +248,7 @@ jobs:
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload amd64 digest
+        if: contains(inputs.platforms, 'linux/arm64')
         uses: actions/upload-artifact@v4
         with:
           name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
