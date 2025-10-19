@@ -101,6 +101,18 @@ jobs:
         run: |
             export
 
+      - name: Identify GitHub Release tag name
+        # get tag name from runners environment 'GITHUB_REF_NAME' and then use bash substring
+        # to strip out '+' symbol - required due to gcr not supporting this as a tag
+        # name (docker hub does support it).
+        # note if push is NOT triggered by tag then 'GITHUB_REF_NAME' will be the branch name.
+        shell: bash
+        run: |
+            tag="${GITHUB_REF_NAME}" && echo "tag=${tag//+/-}" >> $GITHUB_OUTPUT
+            echo "[debug] Generated tag name is '${tag}'"
+            echo "tag=$tag" >> $GITHUB_OUTPUT
+        id: identify_github_release_tag_name
+
       - name: Generate temporary tag name
         shell: bash
         run: |
@@ -117,6 +129,28 @@ jobs:
           echo "app_name=$app_name" >> $GITHUB_OUTPUT
         id: generate_app_name
 
+      - name: Generate major and major-minor version tag names
+        shell: bash
+        run: |
+          # Get release tag name
+          release_version="${{ steps.identify_github_release_tag_name.outputs.tag }}"
+
+          # Validate and construct major and major-minor versions
+          if [[ "${release_version}" =~ ^(v?[0-9]+)\.([0-9]+)\.[0-9]+ ]]; then
+            major_version="${BASH_REMATCH[1]}"
+            minor_version="${BASH_REMATCH[2]}"
+            major_minor_version="${major_version}.${minor_version}"
+            echo "[debug] Constructed major version tag name: ${major_version}"
+            echo "[debug] Constructed major-minor version tag name: ${major_minor_version}"
+            echo "major_version=${major_version}" >> $GITHUB_OUTPUT
+            echo "major_minor_version=${major_minor_version}" >> $GITHUB_OUTPUT
+          else
+            echo "[warn] Release tag '${release_version}' does not include 3 or more octets, major and major-minor version tag names not constructed."
+            echo "major_version=" >> $GITHUB_OUTPUT
+            echo "major_minor_version=" >> $GITHUB_OUTPUT
+          fi
+        id: generate_version_tags
+
       - name: Generate tag names
         shell: bash
         run: |
@@ -129,7 +163,13 @@ jobs:
           # Construct tag names
           tag_names=""
           for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ inputs.tags }}, "
+            tag_names+="${registry}:${{ steps.identify_github_release_tag_name.outputs.tag }}, ${registry}:latest, "
+            if [[ -n "${{ steps.generate_version_tags.outputs.major_version }}" ]]; then
+              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_version }}, "
+            fi
+            if [[ -n "${{ steps.generate_version_tags.outputs.major_minor_version }}" ]]; then
+              tag_names+="${registry}:${{ steps.generate_version_tags.outputs.major_minor_version }}, "
+            fi
           done
 
           # Remove trailing comma and space
@@ -157,7 +197,7 @@ jobs:
           load: true
           tags: ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}
           build-args: |
-            RELEASETAG=${{ inputs.tags }}
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
         id: build-amd64-test
 
@@ -178,7 +218,7 @@ jobs:
           push: true
           tags: ${{ steps.generate_tag_names.outputs.tag_names }}
           build-args: |
-            RELEASETAG=${{ inputs.tags }}
+            RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
         id: build-final-amd64-only
 
@@ -329,7 +369,7 @@ jobs:
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
           tags: |
-            type=raw,value=${{ inputs.tags }}
+            type=raw,value=${{ needs.build-amd64-test.outputs.tag_names }}
 
       # finally create manifest for specified tag
       - name: Create manifest list and push
