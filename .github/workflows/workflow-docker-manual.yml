@@ -102,22 +102,23 @@ jobs:
             export
 
       - name: Generate temporary tag name
+        id: generate_temporary_tag_name
         shell: bash
         run: |
           test_tag=$(date +%Y%m%d%H%M%S)
           echo "[debug] Generated test tag name is '${test_tag}'"
           echo "test_tag=$test_tag" >> $GITHUB_OUTPUT
-        id: generate_temporary_tag_name
 
       - name: Generate app name
+        id: generate_app_name
         shell: bash
         run: |
           app_name=$(echo "${GITHUB_REPOSITORY}" | grep -P -o -m 1 '(?<=/arch-).*')
           echo "[debug] Generated app name is '${app_name}'"
           echo "app_name=$app_name" >> $GITHUB_OUTPUT
-        id: generate_app_name
 
       - name: Generate tag names
+        id: generate_tag_names
         shell: bash
         run: |
           # Define registries
@@ -138,7 +139,6 @@ jobs:
           # Output tag names
           echo "[debug] Constructed tag names: ${tag_names}"
           echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
-        id: generate_tag_names
 
       - name: Remove unnecessary directories to free up space
         run: |
@@ -150,6 +150,7 @@ jobs:
           sudo rm -rf /usr/local/share/boost
 
       - name: Build amd64 image for testing
+        id: build-amd64-test
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -159,7 +160,6 @@ jobs:
           build-args: |
             RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-        id: build-amd64-test
 
       - name: Run tests using previously built image
         shell: bash
@@ -170,6 +170,7 @@ jobs:
           "${git_clone_scripts_dest}/scripts/docker/testrunner.sh" --app-name ${{ steps.generate_app_name.outputs.app_name }} --image-name "ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
 
       - name: Build and push amd64 images by tag name (single arch)
+        id: build-final-amd64-only
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
         with:
@@ -180,9 +181,9 @@ jobs:
           build-args: |
             RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-        id: build-final-amd64-only
 
       - name: Build and push amd64 images by digest (multi arch)
+        id: build-amd64-digest
         if: contains(inputs.platforms, 'linux/arm64')
         uses: docker/build-push-action@v6
         with:
@@ -198,7 +199,6 @@ jobs:
           build-args: |
             RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-        id: build-amd64-digest
 
       - name: Export amd64 digest (multi arch)
         if: contains(inputs.platforms, 'linux/arm64')
@@ -336,6 +336,7 @@ jobs:
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
+          echo "[debug] Displaying Docker metadata output json: '${DOCKER_METADATA_OUTPUT_JSON}'"
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
 
