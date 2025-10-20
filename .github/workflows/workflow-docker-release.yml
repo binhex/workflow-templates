@@ -381,15 +381,16 @@ jobs:
           # note key name 'value' must be set to this for type raw
           # note 'tag_names' format is comma-separated for single type=raw value
           tags: |
-            type=semver,pattern={{version}},value={{ needs.build-amd64-test.outputs.release_tag }}
-            type=semver,pattern={{major}},value={{ needs.build-amd64-test.outputs.release_tag }}
-            type=semver,pattern={{major}}.{{minor}},value={{ needs.build-amd64-test.outputs.release_tag }}
+            type=semver,pattern={{version}},value=${{ needs.build-amd64-test.outputs.release_tag }}
+            type=semver,pattern={{major}},value=${{ needs.build-amd64-test.outputs.release_tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.build-amd64-test.outputs.release_tag }}
+              type=semver,pattern={{version}},value=v1.0.0
             type=raw,value=latest
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
-          echo "docker metadata json '${DOCKER_METADATA_OUTPUT_JSON}'"
+          echo "[debug] Displaying Docker metadata output json: '${DOCKER_METADATA_OUTPUT_JSON}'"
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
 
