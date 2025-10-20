@@ -46,7 +46,8 @@ jobs:
     outputs:
       test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
       app_name: ${{ steps.generate_app_name.outputs.app_name }}
-      tag_names: ${{ steps.generate_tag_names.outputs.tag_names }}
+      tag_name_full_version: ${{ steps.generate_registry_tag_names.outputs.tag_name_full_version }}
+      registry_tag_names: ${{ steps.generate_registry_tag_names.outputs.registry_tag_names }}
       amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
     steps:
 
@@ -117,8 +118,8 @@ jobs:
           echo "[debug] Generated app name is '${app_name}'"
           echo "app_name=$app_name" >> $GITHUB_OUTPUT
 
-      - name: Generate tag names
-        id: generate_tag_names
+      - name: Generate registry tag names
+        id: generate_registry_tag_names
         shell: bash
         run: |
           # Define registries
@@ -128,17 +129,27 @@ jobs:
             "ghcr.io/${{ github.repository }}"          )
 
           # Construct tag names
-          tag_names=""
+          registry_tag_names=""
           for registry in "${registries[@]}"; do
-            tag_names+="${registry}:${{ inputs.tags }}, "
+            registry_tag_names+="${registry}:${{ inputs.tags }}, "
           done
 
           # Remove trailing comma and space
-          tag_names="${tag_names%, }"
+          registry_tag_names="${registry_tag_names%, }"
 
-          # Output tag names
-          echo "[debug] Constructed tag names: ${tag_names}"
-          echo "tag_names=${tag_names}" >> $GITHUB_OUTPUT
+          echo "[debug] Constructed registry tag names: ${registry_tag_names}"
+
+          # get current branch name
+          branch_name="${GITHUB_REF##*/}"
+
+          # if current branch is main or master then tag as per normal, else append branch name to tag name
+          if [[ "${branch_name}" == "main" || "${branch_name}" == "master" ]]; then
+            echo "tag_name_full_version=${{ inputs.tags }}" >> $GITHUB_OUTPUT
+            echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
+          else
+            echo "tag_name_full_version=${{ inputs.tags }}-${branch_name}" >> $GITHUB_OUTPUT
+            echo "registry_tag_names=${registry_tag_names}-${branch_name}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Remove unnecessary directories to free up space
         run: |
@@ -177,7 +188,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.generate_tag_names.outputs.tag_names }}
+          tags: ${{ steps.generate_registry_tag_names.outputs.registry_tag_names }}
           build-args: |
             RELEASETAG=${{ inputs.tags }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
@@ -330,6 +341,7 @@ jobs:
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
           tags: |
+            type=raw,value=${{ needs.build-amd64-test.outputs.tag_name_full_version }}
             type=raw,value=${{ inputs.tags }}
 
       # finally create manifest for specified tag
