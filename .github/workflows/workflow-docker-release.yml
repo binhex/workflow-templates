@@ -185,8 +185,8 @@ jobs:
 
           # Output tag names
           echo "tag_name_full_version=${{ steps.identify_github_release_tag_name.outputs.release_tag }}" >> $GITHUB_OUTPUT
-          echo "tag_name_major_version=${{ steps.identify_github_release_tag_name.outputs.major_version }}" >> $GITHUB_OUTPUT
-          echo "tag_name_major_minor_version=${{ steps.identify_github_release_tag_name.outputs.major_minor_version }}" >> $GITHUB_OUTPUT
+          echo "tag_name_major_version=${{ steps.generate_version_tags.outputs.major_version }}" >> $GITHUB_OUTPUT
+          echo "tag_name_major_minor_version=${{ steps.generate_version_tags.outputs.major_minor_version }}" >> $GITHUB_OUTPUT
           echo "tag_name_latest_version=latest" >> $GITHUB_OUTPUT
           echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
         id: generate_registry_tag_names
