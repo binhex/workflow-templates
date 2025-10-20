@@ -107,6 +107,7 @@ jobs:
             export
 
       - name: Identify GitHub Release tag name
+        id: identify_github_release_tag_name
         # get tag name from runners environment 'GITHUB_REF_NAME' and then use bash substring
         # to strip out '+' symbol - required due to gcr not supporting this as a tag
         # name (docker hub does support it).
@@ -116,25 +117,25 @@ jobs:
             tag="${GITHUB_REF_NAME}" && echo "tag=${tag//+/-}" >> $GITHUB_OUTPUT
             echo "[debug] Generated tag name is '${tag}'"
             echo "release_tag=$tag" >> $GITHUB_OUTPUT
-        id: identify_github_release_tag_name
 
       - name: Generate temporary tag name
+        id: generate_temporary_tag_name
         shell: bash
         run: |
           test_tag=$(date +%Y%m%d%H%M%S)
           echo "[debug] Generated test tag name is '${test_tag}'"
           echo "test_tag=$test_tag" >> $GITHUB_OUTPUT
-        id: generate_temporary_tag_name
 
       - name: Generate app name
+        id: generate_app_name
         shell: bash
         run: |
           app_name=$(echo "${GITHUB_REPOSITORY}" | grep -P -o -m 1 '(?<=/arch-).*')
           echo "[debug] Generated app name is '${app_name}'"
           echo "app_name=$app_name" >> $GITHUB_OUTPUT
-        id: generate_app_name
 
       - name: Generate major and major-minor version tag names
+        id: generate_version_tags
         shell: bash
         run: |
           # Get release tag name
@@ -154,9 +155,9 @@ jobs:
             echo "major_version=" >> $GITHUB_OUTPUT
             echo "major_minor_version=" >> $GITHUB_OUTPUT
           fi
-        id: generate_version_tags
 
       - name: Generate registry tag names
+        id: generate_registry_tag_names
         shell: bash
         run: |
           # Define registries
@@ -183,13 +184,12 @@ jobs:
           echo "[debug] Constructed tag names: ${tag_names}"
           echo "[debug] Constructed registry tag names: ${registry_tag_names}"
 
-          # Output tag names
+          # output all tags for use in subsequent steps and jobs
           echo "tag_name_full_version=${{ steps.identify_github_release_tag_name.outputs.release_tag }}" >> $GITHUB_OUTPUT
           echo "tag_name_major_version=${{ steps.generate_version_tags.outputs.major_version }}" >> $GITHUB_OUTPUT
           echo "tag_name_major_minor_version=${{ steps.generate_version_tags.outputs.major_minor_version }}" >> $GITHUB_OUTPUT
           echo "tag_name_latest_version=latest" >> $GITHUB_OUTPUT
           echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
-        id: generate_registry_tag_names
 
       - name: Remove unnecessary directories to free up space
         run: |
@@ -201,6 +201,7 @@ jobs:
           sudo rm -rf /usr/local/share/boost
 
       - name: Build amd64 image for testing
+        id: build-amd64-test
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -210,7 +211,6 @@ jobs:
           build-args: |
             RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.release_tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-        id: build-amd64-test
 
       - name: Run tests using previously built image
         shell: bash
@@ -221,6 +221,7 @@ jobs:
           "${git_clone_scripts_dest}/scripts/docker/testrunner.sh" --app-name ${{ steps.generate_app_name.outputs.app_name }} --image-name "ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
 
       - name: Build and push amd64 images by tag (single arch)
+        id: build-final-amd64-only
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
         with:
@@ -231,9 +232,9 @@ jobs:
           build-args: |
             RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.release_tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-        id: build-final-amd64-only
 
       - name: Build and push amd64 images by digest (multi arch)
+        id: build-amd64-digest
         if: contains(inputs.platforms, 'linux/arm64')
         uses: docker/build-push-action@v6
         with:
@@ -249,7 +250,6 @@ jobs:
           build-args: |
             RELEASETAG=${{ steps.identify_github_release_tag_name.outputs.release_tag }}
             APPNAME=${{ steps.generate_app_name.outputs.app_name }}
-        id: build-amd64-digest
 
       - name: Export amd64 digest (multi arch)
         if: contains(inputs.platforms, 'linux/arm64')
@@ -380,7 +380,7 @@ jobs:
             quay.io/${{ github.repository }}
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
-          # note 'tag_names' format is comma-separated for single type=raw value
+          # note we are using 'raw' type not 'semver', as not all release versions follow semver
           tags: |
             type=raw,value=${{ needs.build-amd64-test.outputs.tag_name_full_version }}
             type=raw,value=${{ needs.build-amd64-test.outputs.tag_name_major_version }}
