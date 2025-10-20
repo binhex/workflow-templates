@@ -381,7 +381,10 @@ jobs:
           # note key name 'value' must be set to this for type raw
           # note 'tag_names' format is comma-separated for single type=raw value
           tags: |
-            type=raw,value=${{ needs.build-amd64-test.outputs.tag_names }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
