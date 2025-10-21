@@ -119,13 +119,6 @@ jobs:
             echo "[debug] Generated tag name is '${release_tag}'"
             echo "release_tag=${release_tag}" >> $GITHUB_OUTPUT
 
-      - name: Identify GitHub branch name
-        id: identify_github_branch_name
-        shell: bash
-        run: |
-          git_branch_name="$(git branch --show-current)"
-          echo "git_branch_name=${git_branch_name}" >> $GITHUB_OUTPUT
-
       - name: Generate temporary tag name
         id: generate_temporary_tag_name
         shell: bash
