@@ -119,6 +119,13 @@ jobs:
             echo "[debug] Generated tag name is '${release_tag}'"
             echo "release_tag=${release_tag}" >> $GITHUB_OUTPUT
 
+      - name: Identify GitHub branch name
+        id: identify_github_branch_name
+        shell: bash
+        run: |
+          git_branch_name="$(git branch --show-current)"
+          echo "git_branch_name=${git_branch_name}" >> $GITHUB_OUTPUT
+
       - name: Generate temporary tag name
         id: generate_temporary_tag_name
         shell: bash
@@ -185,21 +192,22 @@ jobs:
           echo "[debug] Constructed registry tag names: ${registry_tag_names}"
 
           # get current branch name
-          branch_name="${GITHUB_REF##*/}"
+          # note do NOT use GITHUB_REF here as it may contain the tag name NOT the branch name
+          git_branch_name="$(git branch --show-current)"
 
           # if current branch is main or master then tag as per normal, else append branch name to tag name
-          if [[ "${branch_name}" == "main" || "${branch_name}" == "master" ]]; then
+          if [[ "${git_branch_name}" == "main" || "${git_branch_name}" == "master" ]]; then
             echo "tag_name_full_version=${{ steps.identify_github_release_tag_name.outputs.release_tag }}" >> $GITHUB_OUTPUT
             echo "tag_name_major_version=${{ steps.generate_version_tags.outputs.major_version }}" >> $GITHUB_OUTPUT
             echo "tag_name_major_minor_version=${{ steps.generate_version_tags.outputs.major_minor_version }}" >> $GITHUB_OUTPUT
             echo "tag_name_latest_version=latest" >> $GITHUB_OUTPUT
             echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
           else
-            echo "tag_name_full_version=${{ steps.identify_github_release_tag_name.outputs.release_tag }}-${branch_name}" >> $GITHUB_OUTPUT
-            echo "tag_name_major_version=${{ steps.generate_version_tags.outputs.major_version }}-${branch_name}" >> $GITHUB_OUTPUT
-            echo "tag_name_major_minor_version=${{ steps.generate_version_tags.outputs.major_minor_version }}-${branch_name}" >> $GITHUB_OUTPUT
-            echo "tag_name_latest_version=latest-${branch_name}" >> $GITHUB_OUTPUT
-            echo "registry_tag_names=${registry_tag_names}-${branch_name}" >> $GITHUB_OUTPUT
+            echo "tag_name_full_version=${{ steps.identify_github_release_tag_name.outputs.release_tag }}-${git_branch_name}" >> $GITHUB_OUTPUT
+            echo "tag_name_major_version=${{ steps.generate_version_tags.outputs.major_version }}-${git_branch_name}" >> $GITHUB_OUTPUT
+            echo "tag_name_major_minor_version=${{ steps.generate_version_tags.outputs.major_minor_version }}-${git_branch_name}" >> $GITHUB_OUTPUT
+            echo "tag_name_latest_version=latest-${git_branch_name}" >> $GITHUB_OUTPUT
+            echo "registry_tag_names=${registry_tag_names}-${git_branch_name}" >> $GITHUB_OUTPUT
           fi
 
       - name: Remove unnecessary directories to free up space
