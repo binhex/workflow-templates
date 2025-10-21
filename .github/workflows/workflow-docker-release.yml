@@ -115,7 +115,7 @@ jobs:
         shell: bash
         run: |
             github_ref_name="${GITHUB_REF_NAME}"
-            release_tag=${github_ref_name//+/-}"
+            release_tag="${github_ref_name//+/-}"
             echo "[debug] Generated tag name is '${release_tag}'"
             echo "release_tag=${release_tag}" >> $GITHUB_OUTPUT
 
