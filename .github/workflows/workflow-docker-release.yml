@@ -114,9 +114,10 @@ jobs:
         # note if push is NOT triggered by tag then 'GITHUB_REF_NAME' will be the branch name.
         shell: bash
         run: |
-            tag="${GITHUB_REF_NAME}" && echo "tag=${tag//+/-}" >> $GITHUB_OUTPUT
-            echo "[debug] Generated tag name is '${tag}'"
-            echo "release_tag=$tag" >> $GITHUB_OUTPUT
+            github_ref_name="${GITHUB_REF_NAME}"
+            release_tag=${github_ref_name//+/-}"
+            echo "[debug] Generated tag name is '${release_tag}'"
+            echo "release_tag=${release_tag}" >> $GITHUB_OUTPUT
 
       - name: Generate temporary tag name
         id: generate_temporary_tag_name
