@@ -192,7 +192,9 @@ jobs:
           git_branch_name="$(git branch --show-current)"
           echo "[debug] Current git branch name is '${git_branch_name}'"
           echo "[debug] Environment variable BRANCH_NAME is '${{ env.BRANCH_NAME }}'"
-          
+          test="$(echo ${GITHUB_REF#refs/heads/} | tr / -)"
+          echo "[debug] Test transformed GITHUB_REF is '${test}'"
+
           # if current branch is main or master then tag as per normal, else append branch name to tag name
           if [[ "${git_branch_name}" == "main" || "${git_branch_name}" == "master" ]]; then
             echo "tag_name_full_version=${{ steps.identify_github_release_tag_name.outputs.release_tag }}" >> $GITHUB_OUTPUT
