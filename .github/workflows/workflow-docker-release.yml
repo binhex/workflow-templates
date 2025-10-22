@@ -197,7 +197,7 @@ jobs:
           ls -al .
           git status
           git branch --show-current
-          git_branch_name="$(git branch --show-current)"
+          git_branch_name="$(git log -1 --pretty=%D --decorate-refs=refs/heads/*)"
           echo "[debug] Current git branch name is '${git_branch_name}'"
 
           # if current branch is main or master then tag as per normal, else append branch name to tag name
