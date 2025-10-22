@@ -193,6 +193,8 @@ jobs:
           # get current branch name
           # note do NOT use GITHUB_REF here as it may contain the tag name NOT the branch name
           cd "${{ env.GIT_CHECKOUT_PATH }}" || exit 1
+          echo "[debug] showing files in current directory:"
+          ls -al .
           git_branch_name="$(git branch --show-current)"
           echo "[debug] Current git branch name is '${git_branch_name}'"
 
