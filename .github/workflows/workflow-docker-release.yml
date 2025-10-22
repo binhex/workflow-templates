@@ -179,7 +179,7 @@ jobs:
             fi
           done
 
-          # Remove trailing comma and space
+          # Remove trailing space(s) and comma(s)
           registry_tag_names_no_trailing_spaces="${registry_tag_names%"${registry_tag_names##*[![:space:]]}"}"
           registry_tag_names_no_trailing_commas="${registry_tag_names_no_trailing_spaces%"${registry_tag_names_no_trailing_spaces##*[!,]}"}"
           registry_tag_names="${registry_tag_names_no_trailing_commas}"

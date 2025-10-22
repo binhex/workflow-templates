@@ -44,6 +44,7 @@ jobs:
   build-amd64-test:
     runs-on: ubuntu-latest
     outputs:
+      # create outputs for use in other jobs
       test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
       app_name: ${{ steps.generate_app_name.outputs.app_name }}
       tag_name_full_version: ${{ steps.generate_registry_tag_names.outputs.tag_name_full_version }}
@@ -128,7 +129,7 @@ jobs:
             "quay.io/${{ github.repository }}"
             "ghcr.io/${{ github.repository }}"          )
 
-          # Construct tag names
+          # Construct tag names for each registry
           registry_tag_names=""
           for registry in "${registries[@]}"; do
             registry_tag_names+="${registry}:${{ inputs.tags }}, "
@@ -184,7 +185,7 @@ jobs:
           git clone "${git_clone_scripts_repo}" "${git_clone_scripts_dest}"
           "${git_clone_scripts_dest}/scripts/docker/testrunner.sh" --app-name ${{ steps.generate_app_name.outputs.app_name }} --image-name "ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
 
-      - name: Build and push amd64 images by tag name (single arch)
+      - name: Build and push amd64 images by tag (single arch)
         id: build-final-amd64-only
         if: ${{ !contains(inputs.platforms, 'linux/arm64') }}
         uses: docker/build-push-action@v6
@@ -205,7 +206,7 @@ jobs:
           context: .
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          # note do NOT specify the tag name here, you are pushing by digest not tag
+          # note do NOT specify the tag name here, only repo name, you are pushing by digest not tag
           tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -272,7 +273,7 @@ jobs:
           context: .
           platforms: linux/arm64
           labels: ${{ needs.meta.outputs.labels }}
-          # note do NOT specify the tag name here, you are pushing by digest not tag
+          # note do NOT specify the tag name here, only the repo name, you are pushing by digest not tag
           tags: ${{ github.repository }}
           outputs: |
             type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
@@ -344,11 +345,11 @@ jobs:
             quay.io/${{ github.repository }}
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
+          # note we are using 'raw' type not 'semver', as not all release versions follow semver
           tags: |
             type=raw,value=${{ needs.build-amd64-test.outputs.tag_name_full_version }}
             type=raw,value=${{ inputs.tags }}
 
-      # finally create manifest for specified tag
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
