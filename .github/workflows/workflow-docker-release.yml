@@ -180,7 +180,9 @@ jobs:
           done
 
           # Remove trailing comma and space
-          registry_tag_names="${registry_tag_names%, }"
+          registry_tag_names_no_trailing_spaces="${registry_tag_names%"${registry_tag_names##*[![:space:]]}"}"
+          registry_tag_names_no_trailing_commas="${registry_tag_names_no_trailing_spaces%"${registry_tag_names_no_trailing_spaces##*[!,]}"}"
+          registry_tag_names="${registry_tag_names_no_trailing_commas}"
 
           echo "[debug] Constructed registry tag names: ${registry_tag_names}"
 
