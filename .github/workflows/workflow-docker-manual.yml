@@ -38,7 +38,6 @@ on:
 
 env:
   REGISTRY_IMAGE: ${{ github.repository }}
-  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
 
 jobs:
   # build amd64 image and run tests
@@ -147,15 +146,13 @@ jobs:
           git_branch_name="$(git branch --show-current)"
           echo "[debug] Current git branch name is '${git_branch_name}'"
 
-          echo "[debug] Environment variable BRANCH_NAME is '${{ env.BRANCH_NAME }}'"
-
-          # if current branch is main or master then tag as per normal, else append branch name to tag name
-          if [[ "${branch_name}" == "main" || "${branch_name}" == "master" ]]; then
+          # if current branch is main or master or not defined then tag as per normal, else append branch name to tag name
+          if [[ "${git_branch_name}" == "main" || "${git_branch_name}" == "master" || -z "${git_branch_name}" ]]; then
             echo "tag_name_full_version=${{ inputs.tags }}" >> $GITHUB_OUTPUT
             echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
           else
-            echo "tag_name_full_version=${{ inputs.tags }}-${branch_name}" >> $GITHUB_OUTPUT
-            echo "registry_tag_names=${registry_tag_names}-${branch_name}" >> $GITHUB_OUTPUT
+            echo "tag_name_full_version=${{ inputs.tags }}-${git_branch_name}" >> $GITHUB_OUTPUT
+            echo "registry_tag_names=${registry_tag_names}-${git_branch_name}" >> $GITHUB_OUTPUT
           fi
 
       - name: Remove unnecessary directories to free up space

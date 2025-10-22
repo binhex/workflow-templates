@@ -38,7 +38,6 @@ on:
 
 env:
   REGISTRY_IMAGE: ${{ github.repository }}
-  GIT_CHECKOUT_PATH: ${{ github.workspace }}/checkout
 
 jobs:
   # build amd64 image and run tests
@@ -60,8 +59,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.checkout_ref || github.ref }}
-          # relative path off $GITHUB_WORKSPACE to store checked out code
-          path: checkout
 
       - name: Set up QEMU for multi-arch support
         uses: docker/setup-qemu-action@v3
@@ -103,7 +100,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }} # NOTE: This MUST be the password NOT the token
           repository: ${{ github.repository }}
           short-description: ${{ github.event.repository.description }}
-          readme-filepath: ${{ env.GIT_CHECKOUT_PATH }}/README.md
 
       - name: DEBUG Show Runners environment
         shell: bash
@@ -183,7 +179,7 @@ jobs:
             fi
           done
 
-          # Remove trailing space(s) and comma(s)
+          # Remove trailing comma and space
           registry_tag_names_no_trailing_spaces="${registry_tag_names%"${registry_tag_names##*[![:space:]]}"}"
           registry_tag_names_no_trailing_commas="${registry_tag_names_no_trailing_spaces%"${registry_tag_names_no_trailing_spaces##*[!,]}"}"
           registry_tag_names="${registry_tag_names_no_trailing_commas}"
@@ -192,16 +188,11 @@ jobs:
 
           # get current branch name
           # note do NOT use GITHUB_REF here as it may contain the tag name NOT the branch name
-          cd "${{ env.GIT_CHECKOUT_PATH }}" || exit 1
-          echo "[debug] showing files in current directory:"
-          ls -al .
-          git status
-          git branch --show-current
-          git_branch_name="$(git log -1 --pretty=%D --decorate-refs=refs/heads/*)"
+          git_branch_name="$(git branch --show-current)"
           echo "[debug] Current git branch name is '${git_branch_name}'"
 
-          # if current branch is main or master then tag as per normal, else append branch name to tag name
-          if [[ "${git_branch_name}" == "main" || "${git_branch_name}" == "master" ]]; then
+          # if current branch is main or master or not defined then tag as per normal, else append branch name to tag name
+          if [[ "${git_branch_name}" == "main" || "${git_branch_name}" == "master" || -z "${git_branch_name}" ]]; then
             echo "tag_name_full_version=${{ steps.identify_github_release_tag_name.outputs.release_tag }}" >> $GITHUB_OUTPUT
             echo "tag_name_major_version=${{ steps.generate_version_tags.outputs.major_version }}" >> $GITHUB_OUTPUT
             echo "tag_name_major_minor_version=${{ steps.generate_version_tags.outputs.major_minor_version }}" >> $GITHUB_OUTPUT
