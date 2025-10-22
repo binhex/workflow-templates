@@ -195,6 +195,8 @@ jobs:
           cd "${{ env.GIT_CHECKOUT_PATH }}" || exit 1
           echo "[debug] showing files in current directory:"
           ls -al .
+          git status
+          git branch --show-current
           git_branch_name="$(git branch --show-current)"
           echo "[debug] Current git branch name is '${git_branch_name}'"
 
