@@ -38,7 +38,7 @@ on:
 
 env:
   REGISTRY_IMAGE: ${{ github.repository }}
-  CHECKOUT_PATH: ${{ github.workspace }}/checkout
+  GIT_CHECKOUT_PATH: ${{ github.workspace }}/${{ github.repository }}
 
 jobs:
   # build amd64 image and run tests
@@ -60,8 +60,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.checkout_ref || github.ref }}
-          # relative path off $GITHUB_WORKSPACE to store checked out code
-          path: checkout
 
       - name: Set up QEMU for multi-arch support
         uses: docker/setup-qemu-action@v3
@@ -191,7 +189,7 @@ jobs:
 
           # get current branch name
           # note do NOT use GITHUB_REF here as it may contain the tag name NOT the branch name
-          cd "${{ env.CHECKOUT_PATH }}" || exit 1
+          cd "${{ env.GIT_CHECKOUT_PATH }}" || exit 1
           git_branch_name="$(git branch --show-current)"
           echo "[debug] Current git branch name is '${git_branch_name}'"
 
