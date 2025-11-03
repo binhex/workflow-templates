@@ -147,14 +147,8 @@ jobs:
           git_branch_name="$(git branch --show-current)"
           echo "[debug] Current git branch name is '${git_branch_name}'"
 
-          # if current branch is main or master or not defined then tag as per normal, else append branch name to tag name
-          if [[ "${git_branch_name}" == "main" || "${git_branch_name}" == "master" || -z "${git_branch_name}" ]]; then
-            echo "tag_name_full_version=${{ inputs.tags }}" >> $GITHUB_OUTPUT
-            echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
-          else
-            echo "tag_name_full_version=${{ inputs.tags }}-${git_branch_name}" >> $GITHUB_OUTPUT
-            echo "registry_tag_names=${registry_tag_names}-${git_branch_name}" >> $GITHUB_OUTPUT
-          fi
+          echo "tag_name_full_version=${{ inputs.tags }}" >> $GITHUB_OUTPUT
+          echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
 
       - name: Remove unnecessary directories to free up space
         run: |
