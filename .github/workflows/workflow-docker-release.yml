@@ -196,14 +196,23 @@ jobs:
           registry_tag_names_no_trailing_commas="${registry_tag_names_no_trailing_spaces%"${registry_tag_names_no_trailing_spaces##*[!,]}"}"
           registry_tag_names="${registry_tag_names_no_trailing_commas}"
 
-          # construct full version tag name
+          # construct tag name versions, used in merge-push job
           tag_name_full_version="${{ inputs.tags }}${branch_suffix}"
+          tag_name_major_version="${{ steps.generate_version_tags.outputs.major_version }}${branch_suffix}"
+          tag_name_major_minor_version="${{ steps.generate_version_tags.outputs.major_minor_version }}${branch_suffix}"
+          tag_name_latest_version="latest${branch_suffix}"
 
-          echo "[debug] Current git branch name is '${git_branch_name}'"
+          echo "[debug] Git branch name is '${git_branch_name}'"
           echo "[debug] Constructed tag name full version: ${tag_name_full_version}"
+          echo "[debug] Constructed tag name major version: ${tag_name_major_version}"
+          echo "[debug] Constructed tag name major-minor version: ${tag_name_major_minor_version}"
+          echo "[debug] Constructed tag name latest version: ${tag_name_latest_version}"
           echo "[debug] Constructed registry tag names: ${registry_tag_names}"
 
           echo "tag_name_full_version=${tag_name_full_version}" >> $GITHUB_OUTPUT
+          echo "tag_name_major_version=${tag_name_major_version}" >> $GITHUB_OUTPUT
+          echo "tag_name_major_minor_version=${tag_name_major_minor_version}" >> $GITHUB_OUTPUT
+          echo "tag_name_latest_version=${tag_name_latest_version}" >> $GITHUB_OUTPUT
           echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
 
       - name: Remove unnecessary directories to free up space
