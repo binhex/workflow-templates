@@ -127,34 +127,38 @@ jobs:
           registries=(
             "${{ github.repository }}"
             "quay.io/${{ github.repository }}"
-            "ghcr.io/${{ github.repository }}"          )
+            "ghcr.io/${{ github.repository }}"
+          )
 
           # Construct tag names for each registry
           registry_tag_names=""
           for registry in "${registries[@]}"; do
-            registry_tag_names+="${registry}:${{ inputs.tags }}, "
+            if [[ "${git_branch_name}" != "main" && "${git_branch_name}" != "master" && -n "${git_branch_name}" ]]; then
+              branch_suffix="-${git_branch_name}"
+            else
+              branch_suffix=""
+            fi
+            registry_tag_names+="${registry}:${{ inputs.tags }}${branch_suffix}, "
           done
+
+          # construct full version tag name
+          tag_name_full_version="${{ inputs.tags }}${branch_suffix}"
 
           # Remove trailing space(s) and comma(s)
           registry_tag_names_no_trailing_spaces="${registry_tag_names%"${registry_tag_names##*[![:space:]]}"}"
           registry_tag_names_no_trailing_commas="${registry_tag_names_no_trailing_spaces%"${registry_tag_names_no_trailing_spaces##*[!,]}"}"
           registry_tag_names="${registry_tag_names_no_trailing_commas}"
 
-          echo "[debug] Constructed registry tag names: ${registry_tag_names}"
-
           # get current branch name
           # note do NOT use GITHUB_REF here as it may contain the tag name NOT the branch name
           git_branch_name="$(git branch --show-current)"
-          echo "[debug] Current git branch name is '${git_branch_name}'"
 
-          # if current branch is main or master or not defined then tag as per normal, else append branch name to tag name
-          if [[ "${git_branch_name}" == "main" || "${git_branch_name}" == "master" || -z "${git_branch_name}" ]]; then
-            echo "tag_name_full_version=${{ inputs.tags }}" >> $GITHUB_OUTPUT
-            echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
-          else
-            echo "tag_name_full_version=${{ inputs.tags }}-${git_branch_name}" >> $GITHUB_OUTPUT
-            echo "registry_tag_names=${registry_tag_names}-${git_branch_name}" >> $GITHUB_OUTPUT
-          fi
+          echo "[debug] Current git branch name is '${git_branch_name}'"
+          echo "[debug] Constructed tag name full version: ${tag_name_full_version}"
+          echo "[debug] Constructed registry tag names: ${registry_tag_names}"
+
+          echo "tag_name_full_version=${tag_name_full_version}" >> $GITHUB_OUTPUT
+          echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
 
       - name: Remove unnecessary directories to free up space
         run: |
