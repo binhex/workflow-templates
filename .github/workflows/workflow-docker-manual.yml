@@ -145,13 +145,13 @@ jobs:
             registry_tag_names+="${registry}:${{ inputs.tags }}${branch_suffix}, "
           done
 
-          # construct full version tag name
-          tag_name_full_version="${{ inputs.tags }}${branch_suffix}"
-
           # Remove trailing space(s) and comma(s)
           registry_tag_names_no_trailing_spaces="${registry_tag_names%"${registry_tag_names##*[![:space:]]}"}"
           registry_tag_names_no_trailing_commas="${registry_tag_names_no_trailing_spaces%"${registry_tag_names_no_trailing_spaces##*[!,]}"}"
           registry_tag_names="${registry_tag_names_no_trailing_commas}"
+
+          # construct full version tag name
+          tag_name_full_version="${{ inputs.tags }}${branch_suffix}"
 
           echo "[debug] Current git branch name is '${git_branch_name}'"
           echo "[debug] Constructed tag name full version: ${tag_name_full_version}"
