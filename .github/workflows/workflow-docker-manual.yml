@@ -117,6 +117,18 @@ jobs:
           # get current branch name
           # note do NOT use GITHUB_REF here as it may contain the tag name NOT the branch name
           git_branch_name="$(git branch --show-current)"
+          echo "[debug] Git branch name is '${git_branch_name}'"
+
+          # identify branch name, used as suffix for tag names if not main/master and not empty
+          if [[ "${git_branch_name}" != "main" && "${git_branch_name}" != "master" && -n "${git_branch_name}" ]]; then
+            branch_suffix="-${git_branch_name}"
+          else
+            branch_suffix=""
+          fi
+
+          # construct tag name versions, used in merge-push job
+          tag_name_full_version="${{ inputs.tags }}${branch_suffix}"
+          echo "[debug] Constructed tag name full version: ${tag_name_full_version}"
 
           # Define registries
           registries=(
@@ -128,26 +140,16 @@ jobs:
           # Construct registry tag names, used when pushing a single arch image
           registry_tag_names=""
           for registry in "${registries[@]}"; do
-            if [[ "${git_branch_name}" != "main" && "${git_branch_name}" != "master" && -n "${git_branch_name}" ]]; then
-              branch_suffix="-${git_branch_name}"
-            else
-              branch_suffix=""
-            fi
-            registry_tag_names+="${registry}:${{ inputs.tags }}${branch_suffix}, "
+            registry_tag_names+="${registry}:${tag_name_full_version}, "
           done
 
           # Remove trailing space(s) and comma(s)
           registry_tag_names_no_trailing_spaces="${registry_tag_names%"${registry_tag_names##*[![:space:]]}"}"
           registry_tag_names_no_trailing_commas="${registry_tag_names_no_trailing_spaces%"${registry_tag_names_no_trailing_spaces##*[!,]}"}"
           registry_tag_names="${registry_tag_names_no_trailing_commas}"
-
-          # construct tag name versions, used in merge-push job
-          tag_name_full_version="${{ inputs.tags }}${branch_suffix}"
-
-          echo "[debug] Git branch name is '${git_branch_name}'"
-          echo "[debug] Constructed tag name full version: ${tag_name_full_version}"
           echo "[debug] Constructed registry tag names: ${registry_tag_names}"
 
+          # append to github output for use in subsequent jobs
           echo "tag_name_full_version=${tag_name_full_version}" >> $GITHUB_OUTPUT
           echo "registry_tag_names=${registry_tag_names}" >> $GITHUB_OUTPUT
 
