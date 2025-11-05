@@ -92,7 +92,6 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      # note only required in this job
       - name: Sync GitHub README.md with Docker Hub
         uses: peter-evans/dockerhub-description@v4
         with:
@@ -142,6 +141,9 @@ jobs:
           # Get release tag name
           release_version="${{ steps.identify_github_release_tag_name.outputs.release_tag }}"
 
+          # capture full release tag name
+          echo "release_version=${release_version}" >> $GITHUB_OUTPUT
+
           # Validate and construct major and major-minor versions
           if [[ "${release_version}" =~ ^(v?[0-9]+)\.([0-9]+)\.[0-9]+ ]]; then
             major_version="${BASH_REMATCH[1]}"
@@ -172,7 +174,7 @@ jobs:
             "ghcr.io/${{ github.repository }}"
           )
 
-          # Construct tag names for each registry
+          # Construct registry tag names, used when pushing a single arch image
           registry_tag_names=""
           for registry in "${registries[@]}"; do
             if [[ "${git_branch_name}" != "main" && "${git_branch_name}" != "master" && -n "${git_branch_name}" ]]; then
@@ -197,7 +199,7 @@ jobs:
           registry_tag_names="${registry_tag_names_no_trailing_commas}"
 
           # construct tag name versions, used in merge-push job
-          tag_name_full_version="${{ inputs.tags }}${branch_suffix}"
+          tag_name_full_version="${{ steps.generate_version_tags.outputs.release_version }}${branch_suffix}"
           tag_name_major_version="${{ steps.generate_version_tags.outputs.major_version }}${branch_suffix}"
           tag_name_major_minor_version="${{ steps.generate_version_tags.outputs.major_minor_version }}${branch_suffix}"
           tag_name_latest_version="latest${branch_suffix}"

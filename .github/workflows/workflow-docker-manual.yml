@@ -89,15 +89,6 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      # note only required in this job
-      - name: Sync GitHub README.md with Docker Hub
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }} # NOTE: This MUST be the password NOT the token
-          repository: ${{ github.repository }}
-          short-description: ${{ github.event.repository.description }}
-
       - name: DEBUG Show Runners environment
         shell: bash
         run: |
@@ -134,7 +125,7 @@ jobs:
             "ghcr.io/${{ github.repository }}"
           )
 
-          # Construct tag names for each registry
+          # Construct registry tag names, used when pushing a single arch image
           registry_tag_names=""
           for registry in "${registries[@]}"; do
             if [[ "${git_branch_name}" != "main" && "${git_branch_name}" != "master" && -n "${git_branch_name}" ]]; then
