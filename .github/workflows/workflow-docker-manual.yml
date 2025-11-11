@@ -355,36 +355,89 @@ jobs:
         run: |
           echo "[debug] Displaying Docker metadata output json: '${DOCKER_METADATA_OUTPUT_JSON}'"
 
-          # Extract tags and separate them by registry
-          dockerhub_tags=$(jq -cr '.tags | map(select(startswith("docker.io/"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          ghcr_tags=$(jq -cr '.tags | map(select(startswith("ghcr.io/"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          quay_tags=$(jq -cr '.tags | map(select(startswith("quay.io/"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          # Function to create a single tag with retry logic
+          create_tag_with_retry() {
+            local tag="$1"
+            local source="$2"
+            local max_retries=5
+            local retry_count=0
+            local base_delay=2
 
-          echo "[debug] Docker Hub tags: ${dockerhub_tags}"
-          echo "[debug] GHCR tags: ${ghcr_tags}"
-          echo "[debug] Quay tags: ${quay_tags}"
+            while [[ ${retry_count} -lt ${max_retries} ]]; do
+              echo "[info] Creating tag: ${tag} (attempt $((retry_count + 1))/${max_retries})"
 
-          # Create manifest for Docker Hub first (this will copy the layers)
-          if [[ -n "${dockerhub_tags}" ]]; then
-            echo "[info] Creating manifest for Docker Hub..."
-            docker buildx imagetools create ${dockerhub_tags} $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
-            echo "[info] Waiting 10 seconds before next registry to avoid rate limits..."
-            sleep 10
+              # Capture both stdout and stderr
+              if output=$(docker buildx imagetools create -t "${tag}" "${source}" 2>&1); then
+                echo "[success] Created tag: ${tag}"
+                return 0
+              else
+                echo "[error] Failed to create tag: ${tag}"
+                echo "[debug] Error output: ${output}"
+
+                # Check if it's a 429 error and extract retry-after
+                if echo "${output}" | grep -q "429 Too Many Requests"; then
+                  retry_after_ms=$(echo "${output}" | grep -o 'retry-after: [0-9.]*ms' | grep -o '[0-9.]*' || echo "")
+                  if [[ -n "${retry_after_ms}" ]]; then
+                    # Convert milliseconds to seconds (round up)
+                    retry_after_seconds=$(echo "scale=0; (${retry_after_ms} + 999) / 1000" | bc -l)
+                    echo "[info] Rate limited. Waiting ${retry_after_seconds} seconds as requested by server..."
+                    sleep "${retry_after_seconds}"
+                  else
+                    # Exponential backoff if no retry-after header
+                    delay=$((base_delay * (2 ** retry_count)))
+                    echo "[info] Rate limited. Using exponential backoff: ${delay} seconds..."
+                    sleep "${delay}"
+                  fi
+                else
+                  # Non-429 error, use exponential backoff
+                  delay=$((base_delay * (2 ** retry_count)))
+                  echo "[warn] Non-rate-limit error. Retrying in ${delay} seconds..."
+                  sleep "${delay}"
+                fi
+
+                retry_count=$((retry_count + 1))
+              fi
+            done
+
+            echo "[error] Failed to create tag after ${max_retries} attempts: ${tag}"
+            return 1
+          }
+
+          # Extract tags as arrays
+          dockerhub_tags_array=($(jq -cr '.tags | map(select(startswith("docker.io/"))) | .[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"))
+          ghcr_tags_array=($(jq -cr '.tags | map(select(startswith("ghcr.io/"))) | .[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"))
+          quay_tags_array=($(jq -cr '.tags | map(select(startswith("quay.io/"))) | .[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"))
+
+          echo "[debug] Docker Hub tags: ${dockerhub_tags_array[*]}"
+          echo "[debug] GHCR tags: ${ghcr_tags_array[*]}"
+          echo "[debug] Quay tags: ${quay_tags_array[*]}"
+
+          # Create Docker Hub tags first (from digests)
+          echo "[info] Creating Docker Hub tags..."
+          for tag in "${dockerhub_tags_array[@]}"; do
+            create_tag_with_retry "${tag}" "$(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)"
+            sleep 5  # Small delay between tags
+          done
+
+          # Get first Docker Hub tag for referencing
+          first_dockerhub_tag="${dockerhub_tags_array[0]}"
+
+          # Create GHCR tags (by reference)
+          if [[ ${#ghcr_tags_array[@]} -gt 0 && -n "${first_dockerhub_tag}" ]]; then
+            echo "[info] Creating GHCR tags by reference..."
+            for tag in "${ghcr_tags_array[@]}"; do
+              create_tag_with_retry "${tag}" "${first_dockerhub_tag}"
+              sleep 5  # Small delay between tags
+            done
           fi
 
-          # Create manifests for other registries by referencing the first tag (no layer copying)
-          first_dockerhub_tag=$(jq -cr '.tags | map(select(startswith("docker.io/"))) | first' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-
-          if [[ -n "${ghcr_tags}" && -n "${first_dockerhub_tag}" ]]; then
-            echo "[info] Creating manifest for GHCR by reference..."
-            docker buildx imagetools create ${ghcr_tags} ${first_dockerhub_tag}
-            echo "[info] Waiting 10 seconds before next registry to avoid rate limits..."
-            sleep 10
-          fi
-
-          if [[ -n "${quay_tags}" && -n "${first_dockerhub_tag}" ]]; then
-            echo "[info] Creating manifest for Quay by reference..."
-            docker buildx imagetools create ${quay_tags} ${first_dockerhub_tag}
+          # Create Quay tags (by reference)
+          if [[ ${#quay_tags_array[@]} -gt 0 && -n "${first_dockerhub_tag}" ]]; then
+            echo "[info] Creating Quay tags by reference..."
+            for tag in "${quay_tags_array[@]}"; do
+              create_tag_with_retry "${tag}" "${first_dockerhub_tag}"
+              sleep 5  # Small delay between tags
+            done
           fi
 
       - name: Inspect image
