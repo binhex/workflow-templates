@@ -72,6 +72,7 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
+          registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -132,7 +133,7 @@ jobs:
 
           # Define registries
           registries=(
-            "${{ github.repository }}"
+            "docker.io/${{ github.repository }}"
             "quay.io/${{ github.repository }}"
             "ghcr.io/${{ github.repository }}"
           )
@@ -206,7 +207,7 @@ jobs:
           # note do NOT specify the tag name here, only repo name, you are pushing by digest not tag
           tags: ${{ github.repository }}
           outputs: |
-            type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=docker.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
@@ -246,6 +247,7 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
+          registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -273,7 +275,7 @@ jobs:
           # note do NOT specify the tag name here, only the repo name, you are pushing by digest not tag
           tags: ${{ github.repository }}
           outputs: |
-            type=image,name=${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+            type=image,name=docker.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
             type=image,name=quay.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
@@ -315,6 +317,7 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
+          registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -338,7 +341,7 @@ jobs:
         with:
           # note 'images' format is <registry>/<owner>/<image name>
           images: |
-            ${{ github.repository }}
+            docker.io/${{ github.repository }}
             quay.io/${{ github.repository }}
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
@@ -351,8 +354,34 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         run: |
           echo "[debug] Displaying Docker metadata output json: '${DOCKER_METADATA_OUTPUT_JSON}'"
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+
+          # Extract tags and separate them by registry
+          dockerhub_tags=$(jq -cr '.tags | map(select(startswith("docker.io/"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          ghcr_tags=$(jq -cr '.tags | map(select(startswith("ghcr.io/"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          quay_tags=$(jq -cr '.tags | map(select(startswith("quay.io/"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+
+          echo "[debug] Docker Hub tags: ${dockerhub_tags}"
+          echo "[debug] GHCR tags: ${ghcr_tags}"
+          echo "[debug] Quay tags: ${quay_tags}"
+
+          # Create manifest for Docker Hub first (this will copy the layers)
+          if [[ -n "${dockerhub_tags}" ]]; then
+            echo "[info] Creating manifest for Docker Hub..."
+            docker buildx imagetools create ${dockerhub_tags} $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+          fi
+
+          # Create manifests for other registries by referencing the first tag (no layer copying)
+          first_dockerhub_tag=$(jq -cr '.tags | map(select(startswith("docker.io/"))) | first' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+
+          if [[ -n "${ghcr_tags}" && -n "${first_dockerhub_tag}" ]]; then
+            echo "[info] Creating manifest for GHCR by reference..."
+            docker buildx imagetools create ${ghcr_tags} ${first_dockerhub_tag}
+          fi
+
+          if [[ -n "${quay_tags}" && -n "${first_dockerhub_tag}" ]]; then
+            echo "[info] Creating manifest for Quay by reference..."
+            docker buildx imagetools create ${quay_tags} ${first_dockerhub_tag}
+          fi
 
       - name: Inspect image
         run: |
