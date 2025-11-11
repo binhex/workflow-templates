@@ -425,24 +425,31 @@ jobs:
             sleep 1  # Small delay between tags
           done
 
-          # Get first Docker Hub tag for referencing
-          first_dockerhub_tag="${dockerhub_tags_array[0]}"
-
-          # Create GHCR tags (by reference)
-          if [[ ${#ghcr_tags_array[@]} -gt 0 && -n "${first_dockerhub_tag}" ]]; then
-            echo "[info] Creating GHCR tags by reference..."
+          # Create GHCR tags (from digests)
+          if [[ ${#ghcr_tags_array[@]} -gt 0 ]]; then
+            echo "[info] Creating GHCR tags from digests..."
             for tag in "${ghcr_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${first_dockerhub_tag}"
-              sleep 5  # Small delay between tags
+              # Create array of digest sources
+              digest_sources=()
+              for digest in *; do
+                digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
+              done
+              create_tag_with_retry "${tag}" "${digest_sources[@]}"
+              sleep 1  # Small delay between tags
             done
           fi
 
-          # Create Quay tags (by reference)
-          if [[ ${#quay_tags_array[@]} -gt 0 && -n "${first_dockerhub_tag}" ]]; then
-            echo "[info] Creating Quay tags by reference..."
+          # Create Quay tags (from digests)
+          if [[ ${#quay_tags_array[@]} -gt 0 ]]; then
+            echo "[info] Creating Quay tags from digests..."
             for tag in "${quay_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${first_dockerhub_tag}"
-              sleep 5  # Small delay between tags
+              # Create array of digest sources
+              digest_sources=()
+              for digest in *; do
+                digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
+              done
+              create_tag_with_retry "${tag}" "${digest_sources[@]}"
+              sleep 1  # Small delay between tags
             done
           fi
 
