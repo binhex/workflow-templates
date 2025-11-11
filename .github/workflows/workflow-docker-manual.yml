@@ -358,7 +358,8 @@ jobs:
           # Function to create a single tag with retry logic
           create_tag_with_retry() {
             local tag="$1"
-            local source="$2"
+            shift  # Remove the first argument (tag), rest are sources
+            local sources=("$@")  # All remaining arguments are sources
             local max_retries=5
             local retry_count=0
             local base_delay=2
@@ -367,7 +368,7 @@ jobs:
               echo "[info] Creating tag: ${tag} (attempt $((retry_count + 1))/${max_retries})"
 
               # Capture both stdout and stderr
-              if output=$(docker buildx imagetools create -t "${tag}" "${source}" 2>&1); then
+              if output=$(docker buildx imagetools create -t "${tag}" "${sources[@]}" 2>&1); then
                 echo "[success] Created tag: ${tag}"
                 return 0
               else
@@ -415,8 +416,13 @@ jobs:
           # Create Docker Hub tags first (from digests)
           echo "[info] Creating Docker Hub tags..."
           for tag in "${dockerhub_tags_array[@]}"; do
-            create_tag_with_retry "${tag}" "$(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)"
-            sleep 5  # Small delay between tags
+            # Create array of digest sources
+            digest_sources=()
+            for digest in *; do
+              digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
+            done
+            create_tag_with_retry "${tag}" "${digest_sources[@]}"
+            sleep 1  # Small delay between tags
           done
 
           # Get first Docker Hub tag for referencing
