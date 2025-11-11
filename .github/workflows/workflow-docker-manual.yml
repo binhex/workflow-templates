@@ -413,41 +413,36 @@ jobs:
           echo "[debug] GHCR tags: ${ghcr_tags_array[*]}"
           echo "[debug] Quay tags: ${quay_tags_array[*]}"
 
-          # Create Docker Hub tags first (from digests)
-          echo "[info] Creating Docker Hub tags..."
-          for tag in "${dockerhub_tags_array[@]}"; do
-            # Create array of digest sources
-            digest_sources=()
-            for digest in *; do
-              digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
-            done
-            create_tag_with_retry "${tag}" "${digest_sources[@]}"
-            sleep 1  # Small delay between tags
+          # Build digest sources array once (from local digest files)
+          echo "[info] Building digest sources from local files..."
+          digest_sources=()
+          for digest in *; do
+            digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
           done
+          echo "[debug] Digest sources: ${digest_sources[*]}"
 
-          # Create GHCR tags (from digests)
-          if [[ ${#ghcr_tags_array[@]} -gt 0 ]]; then
-            echo "[info] Creating GHCR tags from digests..."
-            for tag in "${ghcr_tags_array[@]}"; do
-              # Create array of digest sources
-              digest_sources=()
-              for digest in *; do
-                digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
-              done
+          # Create Docker Hub tags (from local digests - no pulls)
+          if [[ ${#dockerhub_tags_array[@]} -gt 0 ]]; then
+            echo "[info] Creating Docker Hub tags from local digests..."
+            for tag in "${dockerhub_tags_array[@]}"; do
               create_tag_with_retry "${tag}" "${digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
           fi
 
-          # Create Quay tags (from digests)
+          # Create GHCR tags (from local digests - no pulls)
+          if [[ ${#ghcr_tags_array[@]} -gt 0 ]]; then
+            echo "[info] Creating GHCR tags from local digests..."
+            for tag in "${ghcr_tags_array[@]}"; do
+              create_tag_with_retry "${tag}" "${digest_sources[@]}"
+              sleep 1  # Small delay between tags
+            done
+          fi
+
+          # Create Quay tags (from local digests - no pulls)
           if [[ ${#quay_tags_array[@]} -gt 0 ]]; then
-            echo "[info] Creating Quay tags from digests..."
+            echo "[info] Creating Quay tags from local digests..."
             for tag in "${quay_tags_array[@]}"; do
-              # Create array of digest sources
-              digest_sources=()
-              for digest in *; do
-                digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
-              done
               create_tag_with_retry "${tag}" "${digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
@@ -455,4 +450,5 @@ jobs:
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+          # Inspect from GHCR to avoid Docker Hub API calls
+          docker buildx imagetools inspect ghcr.io/${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
