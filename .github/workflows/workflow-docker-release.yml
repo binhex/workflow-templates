@@ -407,7 +407,7 @@ jobs:
         with:
           # note 'images' format is <registry>/<owner>/<image name>
           images: |
-            ${{ github.repository }}
+            docker.io/${{ github.repository }}
             quay.io/${{ github.repository }}
             ghcr.io/${{ github.repository }}
           # note key name 'value' must be set to this for type raw
