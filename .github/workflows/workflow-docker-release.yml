@@ -436,6 +436,8 @@ jobs:
           if [[ -n "${dockerhub_tags}" ]]; then
             echo "[info] Creating manifest for Docker Hub..."
             docker buildx imagetools create ${dockerhub_tags} $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+            echo "[info] Waiting 10 seconds before next registry to avoid rate limits..."
+            sleep 10
           fi
 
           # Create manifests for other registries by referencing the first tag (no layer copying)
@@ -444,6 +446,8 @@ jobs:
           if [[ -n "${ghcr_tags}" && -n "${first_dockerhub_tag}" ]]; then
             echo "[info] Creating manifest for GHCR by reference..."
             docker buildx imagetools create ${ghcr_tags} ${first_dockerhub_tag}
+            echo "[info] Waiting 10 seconds before next registry to avoid rate limits..."
+            sleep 10
           fi
 
           if [[ -n "${quay_tags}" && -n "${first_dockerhub_tag}" ]]; then
