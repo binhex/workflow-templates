@@ -455,8 +455,3 @@ jobs:
               sleep 1  # Small delay between tags
             done
           fi
-
-      - name: Inspect image
-        run: |
-          # Inspect from GHCR to avoid Docker Hub API calls
-          docker buildx imagetools inspect ghcr.io/${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
