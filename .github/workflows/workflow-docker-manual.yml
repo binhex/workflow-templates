@@ -425,7 +425,7 @@ jobs:
           echo "[info] Building digest sources from local files..."
           digest_sources=()
           for digest in *; do
-            digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
+            digest_sources+=("ghcr.io/${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
           done
           echo "[debug] Digest sources: ${digest_sources[*]}"
 
