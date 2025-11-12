@@ -225,7 +225,7 @@ jobs:
         if: contains(inputs.platforms, 'linux/arm64')
         uses: actions/upload-artifact@v4
         with:
-          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -291,7 +291,7 @@ jobs:
       - name: Upload arm64 digest (multi arch)
         uses: actions/upload-artifact@v4
         with:
-          name: digests-arm64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: digests-arm64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -308,7 +308,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-*-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}
+          pattern: digests-*-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           merge-multiple: true
 
       - name: Set up Docker Buildx
