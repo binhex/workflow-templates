@@ -51,7 +51,6 @@ jobs:
       random_digest_name: ${{ steps.generate_random_digest_name.outputs.random_digest_name }}
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
