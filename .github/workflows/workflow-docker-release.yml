@@ -53,6 +53,7 @@ jobs:
       tag_name_major_minor_version: ${{ steps.generate_registry_tag_names.outputs.tag_name_major_minor_version }}
       tag_name_latest_version: ${{ steps.generate_registry_tag_names.outputs.tag_name_latest_version }}
       registry_tag_names: ${{ steps.generate_registry_tag_names.outputs.registry_tag_names }}
+      random_digest_name: ${{ steps.generate_random_digest_name.outputs.random_digest_name }}
       amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
     steps:
       - name: Checkout
@@ -126,6 +127,13 @@ jobs:
           test_tag=$(date +%Y%m%d%H%M%S)
           echo "[debug] Generated test tag name is '${test_tag}'"
           echo "test_tag=$test_tag" >> $GITHUB_OUTPUT
+
+      - name: Generate random digest name
+        id: generate_random_digest_name
+        run: |
+          random_digest_name=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
+          echo "[debug] Generated random digest name is '${random_digest_name}'"
+          echo "random_digest_name=${random_digest_name}" >> $GITHUB_OUTPUT
 
       - name: Generate app name
         id: generate_app_name
@@ -292,7 +300,7 @@ jobs:
         if: contains(inputs.platforms, 'linux/arm64')
         uses: actions/upload-artifact@v4
         with:
-          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ steps.generate_temporary_tag_name.outputs.test_tag }}
+          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ steps.generate_temporary_tag_name.outputs.random_digest_name }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -358,7 +366,7 @@ jobs:
       - name: Upload arm64 digest (multi arch)
         uses: actions/upload-artifact@v4
         with:
-          name: digests-arm64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.build-amd64-test.outputs.test_tag }}
+          name: digests-arm64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.build-amd64-test.outputs.random_digest_name }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -375,7 +383,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-*-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.build-amd64-test.outputs.test_tag }}
+          pattern: digests-*-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ needs.build-amd64-test.outputs.random_digest_name }}
           merge-multiple: true
 
       - name: Set up Docker Buildx
