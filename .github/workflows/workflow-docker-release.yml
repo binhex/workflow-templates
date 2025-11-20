@@ -43,18 +43,17 @@ jobs:
   # build amd64 image and run tests
   build-amd64-test:
     runs-on: ubuntu-latest
+
+    # create outputs for use in other jobs
     outputs:
-      # create outputs for use in other jobs
-      test_tag: ${{ steps.generate_temporary_tag_name.outputs.test_tag }}
       app_name: ${{ steps.generate_app_name.outputs.app_name }}
       release_tag: ${{ steps.identify_github_release_tag_name.outputs.release_tag }}
       tag_name_full_version: ${{ steps.generate_registry_tag_names.outputs.tag_name_full_version }}
       tag_name_major_version: ${{ steps.generate_registry_tag_names.outputs.tag_name_major_version }}
       tag_name_major_minor_version: ${{ steps.generate_registry_tag_names.outputs.tag_name_major_minor_version }}
       tag_name_latest_version: ${{ steps.generate_registry_tag_names.outputs.tag_name_latest_version }}
-      registry_tag_names: ${{ steps.generate_registry_tag_names.outputs.registry_tag_names }}
       random_digest_name: ${{ steps.generate_random_digest_name.outputs.random_digest_name }}
-      amd64_digest: ${{ steps.build-amd64-test.outputs.digest }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -300,7 +299,7 @@ jobs:
         if: contains(inputs.platforms, 'linux/arm64')
         uses: actions/upload-artifact@v4
         with:
-          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ steps.generate_temporary_tag_name.outputs.random_digest_name }}
+          name: digests-amd64-${{ inputs.tags }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ steps.generate_random_digest_name.outputs.random_digest_name }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
