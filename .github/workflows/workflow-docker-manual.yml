@@ -427,38 +427,69 @@ jobs:
           echo "[debug] GHCR tags: ${ghcr_tags_array[*]}"
           echo "[debug] Quay tags: ${quay_tags_array[*]}"
 
-          # Build digest sources array once (from local digest files)
-          echo "[info] Building digest sources from local files..."
-          digest_sources=()
+          # Build digest sources from ghcr.io (avoids docker.io rate limits)
+          echo "[info] Building digest sources from GHCR..."
+          ghcr_digest_sources=()
           for digest in *; do
-            # Use GHCR instead of Docker Hub to avoid rate limits
-            digest_sources+=("ghcr.io/${{ github.repository }}@sha256:${digest}")
+            ghcr_digest_sources+=("ghcr.io/${{ github.repository }}@sha256:${digest}")
           done
-          echo "[debug] Digest sources: ${digest_sources[*]}"
+          echo "[debug] Digest sources: ${ghcr_digest_sources[*]}"
 
-          # Create GHCR tags first (from local digests - no pulls)
+          # Function to check if a digest is available
+          check_digest_available() {
+            local digest_ref="$1"
+            local max_attempts=30
+            local attempt=0
+            local delay=2
+
+            while [[ ${attempt} -lt ${max_attempts} ]]; do
+              echo "[info] Checking digest availability: ${digest_ref} (attempt $((attempt + 1))/${max_attempts})"
+              if docker buildx imagetools inspect "${digest_ref}" >/dev/null 2>&1; then
+                echo "[success] Digest available: ${digest_ref}"
+                return 0
+              fi
+              echo "[warn] Digest not yet available, waiting ${delay} seconds..."
+              sleep ${delay}
+              attempt=$((attempt + 1))
+            done
+
+            echo "[error] Digest not available after ${max_attempts} attempts: ${digest_ref}"
+            return 1
+          }
+
+          # Verify all GHCR digests are available before proceeding
+          echo "[info] Verifying GHCR digest availability..."
+          for digest_source in "${ghcr_digest_sources[@]}"; do
+            if ! check_digest_available "${digest_source}"; then
+              echo "[error] Failed to verify digest availability, exiting..."
+              exit 1
+            fi
+          done
+          echo "[success] All GHCR digests are available"
+
+          # Create GHCR tags first
           if [[ ${#ghcr_tags_array[@]} -gt 0 ]]; then
-            echo "[info] Creating GHCR tags from local digests..."
+            echo "[info] Creating GHCR tags from GHCR digests..."
             for tag in "${ghcr_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${digest_sources[@]}"
+              create_tag_with_retry "${tag}" "${ghcr_digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
           fi
 
-          # Create Quay tags second (from GHCR - no Docker Hub pulls)
+          # Create Quay tags second
           if [[ ${#quay_tags_array[@]} -gt 0 ]]; then
             echo "[info] Creating Quay tags from GHCR digests..."
             for tag in "${quay_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${digest_sources[@]}"
+              create_tag_with_retry "${tag}" "${ghcr_digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
           fi
 
-          # Create Docker Hub tags last (from GHCR - most likely to have rate limits)
+          # Create Docker Hub tags last (to avoid rate limits on pulls)
           if [[ ${#dockerhub_tags_array[@]} -gt 0 ]]; then
             echo "[info] Creating Docker Hub tags from GHCR digests..."
             for tag in "${dockerhub_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${digest_sources[@]}"
+              create_tag_with_retry "${tag}" "${ghcr_digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
           fi
