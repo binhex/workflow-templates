@@ -497,37 +497,37 @@ jobs:
           echo "[debug] GHCR tags: ${ghcr_tags_array[*]}"
           echo "[debug] Quay tags: ${quay_tags_array[*]}"
 
-          # Build digest sources from ghcr.io (avoids docker.io rate limits)
-          echo "[info] Building digest sources from GHCR..."
-          ghcr_digest_sources=()
+          # Note: GHCR digests pushed without tags are not reliably pullable
+          echo "[info] Building digest sources from Docker Hub..."
+          dockerio_digest_sources=()
           for digest in *; do
-            ghcr_digest_sources+=("ghcr.io/${{ github.repository }}@sha256:${digest}")
+            dockerio_digest_sources+=("docker.io/${{ github.repository }}@sha256:${digest}")
           done
-          echo "[debug] Digest sources: ${ghcr_digest_sources[*]}"
+          echo "[debug] Digest sources: ${dockerio_digest_sources[*]}"
 
           # Create GHCR tags first
           if [[ ${#ghcr_tags_array[@]} -gt 0 ]]; then
-            echo "[info] Creating GHCR tags from GHCR digests..."
+            echo "[info] Creating GHCR tags from Docker Hub digests..."
             for tag in "${ghcr_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${ghcr_digest_sources[@]}"
+              create_tag_with_retry "${tag}" "${dockerio_digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
           fi
 
           # Create Quay tags second
           if [[ ${#quay_tags_array[@]} -gt 0 ]]; then
-            echo "[info] Creating Quay tags from GHCR digests..."
+            echo "[info] Creating Quay tags from Docker Hub digests..."
             for tag in "${quay_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${ghcr_digest_sources[@]}"
+              create_tag_with_retry "${tag}" "${dockerio_digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
           fi
 
-          # Create Docker Hub tags last (to avoid rate limits on pulls)
+          # Create Docker Hub tags last
           if [[ ${#dockerhub_tags_array[@]} -gt 0 ]]; then
-            echo "[info] Creating Docker Hub tags from GHCR digests..."
+            echo "[info] Creating Docker Hub tags from Docker Hub digests..."
             for tag in "${dockerhub_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${ghcr_digest_sources[@]}"
+              create_tag_with_retry "${tag}" "${dockerio_digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
           fi
