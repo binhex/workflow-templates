@@ -501,20 +501,12 @@ jobs:
           echo "[info] Building digest sources from local files..."
           digest_sources=()
           for digest in *; do
-            digest_sources+=("${{ env.REGISTRY_IMAGE }}@sha256:${digest}")
+            # Use GHCR instead of Docker Hub to avoid rate limits
+            digest_sources+=("ghcr.io/${{ github.repository }}@sha256:${digest}")
           done
           echo "[debug] Digest sources: ${digest_sources[*]}"
 
-          # Create Docker Hub tags (from local digests - no pulls)
-          if [[ ${#dockerhub_tags_array[@]} -gt 0 ]]; then
-            echo "[info] Creating Docker Hub tags from local digests..."
-            for tag in "${dockerhub_tags_array[@]}"; do
-              create_tag_with_retry "${tag}" "${digest_sources[@]}"
-              sleep 1  # Small delay between tags
-            done
-          fi
-
-          # Create GHCR tags (from local digests - no pulls)
+          # Create GHCR tags first (from local digests - no pulls)
           if [[ ${#ghcr_tags_array[@]} -gt 0 ]]; then
             echo "[info] Creating GHCR tags from local digests..."
             for tag in "${ghcr_tags_array[@]}"; do
@@ -523,10 +515,19 @@ jobs:
             done
           fi
 
-          # Create Quay tags (from local digests - no pulls)
+          # Create Quay tags second (from GHCR - no Docker Hub pulls)
           if [[ ${#quay_tags_array[@]} -gt 0 ]]; then
-            echo "[info] Creating Quay tags from local digests..."
+            echo "[info] Creating Quay tags from GHCR digests..."
             for tag in "${quay_tags_array[@]}"; do
+              create_tag_with_retry "${tag}" "${digest_sources[@]}"
+              sleep 1  # Small delay between tags
+            done
+          fi
+
+          # Create Docker Hub tags last (from GHCR - most likely to have rate limits)
+          if [[ ${#dockerhub_tags_array[@]} -gt 0 ]]; then
+            echo "[info] Creating Docker Hub tags from GHCR digests..."
+            for tag in "${dockerhub_tags_array[@]}"; do
               create_tag_with_retry "${tag}" "${digest_sources[@]}"
               sleep 1  # Small delay between tags
             done
