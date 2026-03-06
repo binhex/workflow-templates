@@ -42,7 +42,7 @@ env:
 jobs:
   # build amd64 image and run tests
   build-amd64-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     # create outputs for use in other jobs
     outputs:
